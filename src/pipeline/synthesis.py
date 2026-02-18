@@ -177,7 +177,7 @@ def plot_bibliometrics(
             country_counts = pd.Series(countries).value_counts().head(20)
             fig, ax = plt.subplots(figsize=(10, 6))
             country_counts.plot.barh(ax=ax, color="#4c72b0")
-            ax.set_xlabel("Number of Affiliations")
+            ax.set_xlabel("Number of documents")
             ax.set_title("Top 20 Countries")
             ax.invert_yaxis()
             plt.tight_layout()
@@ -189,15 +189,18 @@ def plot_bibliometrics(
         institutions: list[str] = []
         for raw in df[aff_col].dropna():
             for entry in str(raw).split(";"):
-                inst = entry.strip().split(",")[0].strip()
+                parts = [p.strip() for p in entry.split(",")]
+                # Prefer the 2nd token (university) over the 1st (department);
+                # fall back to the 1st if there is only one token.
+                inst = parts[1] if len(parts) >= 2 else parts[0] if parts else ""
                 if inst:
                     institutions.append(inst)
 
         if institutions:
             inst_counts = pd.Series(institutions).value_counts().head(20)
             fig, ax = plt.subplots(figsize=(10, 6))
-            inst_counts.plot.barh(ax=ax, color="#55a868")
-            ax.set_xlabel("Number of Entries")
+            inst_counts.plot.barh(ax=ax, color="#4c72b0")
+            ax.set_xlabel("Number of documents")
             ax.set_title("Top 20 Affiliations")
             ax.invert_yaxis()
             plt.tight_layout()
