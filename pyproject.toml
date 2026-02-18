@@ -7,7 +7,7 @@ name = "slr-pipeline"
 version = "0.1.0"
 description = "Automated Systematic Literature Review pipeline"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.14"
 license = { text = "MIT" }
 
 dependencies = []

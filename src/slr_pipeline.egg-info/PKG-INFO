@@ -3,7 +3,7 @@ Name: slr-pipeline
 Version: 0.1.0
 Summary: Automated Systematic Literature Review pipeline
 License: MIT
-Requires-Python: >=3.11
+Requires-Python: <3.14,>=3.13
 Description-Content-Type: text/markdown
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
