@@ -34,6 +34,7 @@ class TestPerformLdaSweep:
         """Verify it iterates over the requested range of K."""
         # Setup mocks
         mock_lda_instance = MagicMock()
+        mock_lda_instance.log_perplexity.return_value = -7.0
         MockLda.return_value = mock_lda_instance
         
         mock_coherence_instance = MagicMock()
@@ -54,6 +55,8 @@ class TestPerformLdaSweep:
         assert len(results) == 2
         assert results[0].k == 2
         assert results[1].k == 3
+        assert results[0].perplexity == -7.0
+        assert results[1].perplexity == -7.0
         assert MockLda.call_count == 2
         
         # Check LdaModel init calls
@@ -64,8 +67,12 @@ class TestPerformLdaSweep:
 
     @patch("pipeline.topic_model.LdaModel")
     @patch("pipeline.topic_model.CoherenceModel")
-    def test_returns_coherence_scores(self, MockCoherence, MockLda, mock_corpus, mock_dictionary):
-        """Verify it captures coherence score."""
+    def test_returns_coherence_and_perplexity(self, MockCoherence, MockLda, mock_corpus, mock_dictionary):
+        """Verify it captures coherence score and perplexity."""
+        mock_lda_instance = MagicMock()
+        mock_lda_instance.log_perplexity.side_effect = [-7.0, -6.5]
+        MockLda.return_value = mock_lda_instance
+
         mock_coherence = MockCoherence.return_value
         mock_coherence.get_coherence.side_effect = [0.4, 0.6]  # K=2 -> 0.4, K=3 -> 0.6
 
@@ -78,6 +85,8 @@ class TestPerformLdaSweep:
 
         assert results[0].coherence == 0.4
         assert results[1].coherence == 0.6
+        assert results[0].perplexity == -7.0
+        assert results[1].perplexity == -6.5
 
 
 # ── train_final_model ─────────────────────────────────────────────────

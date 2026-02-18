@@ -24,7 +24,9 @@ from pipeline.quality_review import export_for_review
 from pipeline.synthesis import (
     convert_to_litstudy,
     generate_report,
+    export_report_tex,
     plot_topics,
+    plot_topic_audit,
     plot_bibliometrics,
 )
 
@@ -82,6 +84,11 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
         random_state=config.random_state
     )
     
+    # Generate topic audit plot (perplexity + coherence vs K)
+    audit_plot_path = config.processed_dir / "topic_audit_plot.png"
+    logger.info(f"Generating topic audit plot at {audit_plot_path}...")
+    plot_topic_audit(sweep_results, audit_plot_path)
+
     # Simple logic to pick best K: max coherence
     best_result = max(sweep_results, key=lambda x: x.coherence)
     optimal_k = best_result.k
@@ -124,6 +131,11 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # 1. Report stats
     stats = generate_report(df_selected)
     logger.info(f"Report Stats: {stats}")
+    
+    # Export for LaTeX
+    tex_path = config.processed_dir / "synthesis_report.tex"
+    logger.info(f"Exporting synthesis report to {tex_path}...")
+    export_report_tex(stats, tex_path)
     
     # 2. LitStudy conversion (demo)
     try:

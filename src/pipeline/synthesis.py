@@ -89,6 +89,46 @@ def generate_report(df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def export_report_tex(stats: dict[str, Any], output_path: Path | str) -> None:
+    """Format the synthesis statistics as a LaTeX table and save to .tex file.
+
+    Parameters
+    ----------
+    stats : dict[str, Any]
+        Dictionary of statistics from generate_report.
+    output_path : Path | str
+        Path to save the .tex file.
+    """
+    total_docs = stats.get("total_papers", 0)
+    min_year = stats.get("min_year", "")
+    max_year = stats.get("max_year", "")
+    total_cites = stats.get("total_citations", 0)
+
+    year_range = f"{min_year} -- {max_year}" if min_year and max_year else "N/A"
+
+    tex_content = rf"""\begin{{table}}[h]
+\centering
+\begin{{tabular}}{{lr}}
+\hline
+\textbf{{Metric}} & \textbf{{Value}} \\
+\hline
+Total Documents & {total_docs} \\
+Year Range & {year_range} \\
+Total Citations & {total_cites} \\
+\hline
+\end{{tabular}}
+\caption{{Synthesis Report Statistics}}
+\label{{tab:synthesis_report}}
+\end{{table}}
+"""
+
+    # Ensure parent directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(tex_content)
+
+
 def plot_topics(
     model: LdaModel,
     corpus: list[list[tuple[int, int]]],
@@ -119,6 +159,55 @@ def plot_topics(
     
     # Save to HTML
     pyLDAvis.save_html(vis_data, str(output_path))
+
+
+def plot_topic_audit(
+    sweep_results: list,
+    output_path: Path | str,
+) -> None:
+    """Generate a dual-panel audit plot showing Perplexity and Coherence vs K.
+
+    This mirrors the legacy notebook's approach: side-by-side charts of
+    Perplexity (blue) and Coherence (orange) across the range of tested
+    topic counts, allowing the user to visually evaluate the optimal K.
+
+    Parameters
+    ----------
+    sweep_results : list[SweepResult]
+        Results from ``perform_lda_sweep``.  Each must have ``k``,
+        ``perplexity`` and ``coherence`` attributes.
+    output_path : Path | str
+        Where to save the PNG chart.
+    """
+    import matplotlib
+    matplotlib.use("Agg")          # non-interactive backend
+    import matplotlib.pyplot as plt
+
+    k_values      = [r.k for r in sweep_results]
+    perplexities  = [r.perplexity for r in sweep_results]
+    coherences    = [r.coherence for r in sweep_results]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # ── Left panel: Perplexity ─────────────────────────────────────
+    ax1.plot(k_values, perplexities, marker="o", color="#4c72b0")
+    ax1.set_title("Perplexity by Number of Topics")
+    ax1.set_xlabel("Number of topics")
+    ax1.set_ylabel("Log Perplexity")
+
+    # ── Right panel: Coherence ─────────────────────────────────────
+    ax2.plot(k_values, coherences, marker="o", color="orange")
+    ax2.set_title("Coherence by Number of Topics")
+    ax2.set_xlabel("Number of topics")
+    ax2.set_ylabel("Coherence")
+
+    plt.tight_layout()
+
+    # Ensure parent directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    fig.savefig(str(output_path), dpi=150)
+    plt.close(fig)
 
 
 def plot_bibliometrics(

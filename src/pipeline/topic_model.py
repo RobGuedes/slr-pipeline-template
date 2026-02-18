@@ -21,6 +21,7 @@ class SweepResult:
     
     k: int
     coherence: float
+    perplexity: float
     model: LdaModel
 
 
@@ -88,7 +89,8 @@ def perform_lda_sweep(
         # Safe default is u_mass for speed and simplicity here.
         
         score = coherence_model.get_coherence()
-        results.append(SweepResult(k=k, coherence=score, model=model))
+        perplexity = model.log_perplexity(corpus)
+        results.append(SweepResult(k=k, coherence=score, perplexity=perplexity, model=model))
 
     return results
 
