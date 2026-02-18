@@ -21,7 +21,12 @@ from pipeline.topic_model import perform_lda_sweep, train_final_model
 from pipeline.topic_identify import get_all_topic_labels
 from pipeline.topic_select import assign_dominant_topic, filter_documents
 from pipeline.quality_review import export_for_review
-from pipeline.synthesis import convert_to_litstudy, generate_report, plot_topics
+from pipeline.synthesis import (
+    convert_to_litstudy,
+    generate_report,
+    plot_topics,
+    plot_bibliometrics,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -124,6 +129,11 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     try:
         docs_lit = convert_to_litstudy(df_selected)
         logger.info(f"Converted to LitStudy DocumentSet with {len(docs_lit)} docs.")
+        
+        # Generate bibliometric plots
+        logger.info("Generating bibliometric plots (trends, authors, affiliations)...")
+        plot_bibliometrics(df_selected, docs_lit, config.processed_dir)
+        
     except ImportError:
         logger.warning("LitStudy not installed, skipping advanced bibliometrics.")
         

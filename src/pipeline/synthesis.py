@@ -119,3 +119,87 @@ def plot_topics(
     
     # Save to HTML
     pyLDAvis.save_html(vis_data, str(output_path))
+
+
+def plot_bibliometrics(
+    df: pd.DataFrame,
+    docs: "DocumentSet",
+    output_dir: Path | str,
+) -> None:
+    """Generate bibliometric plots and save them to output_dir.
+
+    Uses LitStudy for year/author histograms (which parse correctly from CSV),
+    and parses countries/affiliations directly from the DataFrame's
+    ``Affiliations`` column (semicolon-separated entries where the last
+    comma-separated token is typically the country).
+
+    Plots generated:
+    - publication_years.png
+    - top_authors.png
+    - top_countries.png
+    - top_affiliations.png
+    """
+    import matplotlib
+    matplotlib.use("Agg")          # non-interactive backend
+    import matplotlib.pyplot as plt
+
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    # ── 1. Publication Years (via LitStudy) ────────────────────────
+    plt.figure(figsize=(10, 5))
+    litstudy.plot_year_histogram(docs)
+    plt.title("Publication Trends")
+    plt.tight_layout()
+    plt.savefig(out / "publication_years.png", dpi=150)
+    plt.close()
+
+    # ── 2. Top Authors (via LitStudy) ──────────────────────────────
+    plt.figure(figsize=(10, 5))
+    litstudy.plot_author_histogram(docs, limit=20)
+    plt.title("Top 20 Authors")
+    plt.tight_layout()
+    plt.savefig(out / "top_authors.png", dpi=150)
+    plt.close()
+
+    # ── 3. Top Countries (parsed from DataFrame) ──────────────────
+    aff_col = "Affiliations" if "Affiliations" in df.columns else "affiliations"
+    if aff_col in df.columns:
+        countries: list[str] = []
+        for raw in df[aff_col].dropna():
+            # Each entry is semicolon-separated; last token after comma is country
+            for entry in str(raw).split(";"):
+                parts = [p.strip() for p in entry.split(",")]
+                if parts:
+                    countries.append(parts[-1])
+
+        if countries:
+            country_counts = pd.Series(countries).value_counts().head(20)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            country_counts.plot.barh(ax=ax, color="#4c72b0")
+            ax.set_xlabel("Number of Affiliations")
+            ax.set_title("Top 20 Countries")
+            ax.invert_yaxis()
+            plt.tight_layout()
+            fig.savefig(out / "top_countries.png", dpi=150)
+            plt.close(fig)
+
+    # ── 4. Top Affiliations / Institutions (parsed from DataFrame) ─
+    if aff_col in df.columns:
+        institutions: list[str] = []
+        for raw in df[aff_col].dropna():
+            for entry in str(raw).split(";"):
+                inst = entry.strip().split(",")[0].strip()
+                if inst:
+                    institutions.append(inst)
+
+        if institutions:
+            inst_counts = pd.Series(institutions).value_counts().head(20)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            inst_counts.plot.barh(ax=ax, color="#55a868")
+            ax.set_xlabel("Number of Entries")
+            ax.set_title("Top 20 Affiliations")
+            ax.invert_yaxis()
+            plt.tight_layout()
+            fig.savefig(out / "top_affiliations.png", dpi=150)
+            plt.close(fig)
