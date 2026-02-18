@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/pipeline/__init__.py
+src/slr_pipeline.egg-info/PKG-INFO
+src/slr_pipeline.egg-info/SOURCES.txt
+src/slr_pipeline.egg-info/dependency_links.txt
+src/slr_pipeline.egg-info/requires.txt
+src/slr_pipeline.egg-info/top_level.txt
+tests/test_config.py
