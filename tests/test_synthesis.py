@@ -37,14 +37,15 @@ class TestConvertToLitStudy:
         # Patch litstudy module imported in synthesis.py
         with patch("pipeline.synthesis.litstudy") as MockLitStudy:
             docs = convert_to_litstudy(sample_df)
-            # Verify load_pandas was called
-            MockLitStudy.load_pandas.assert_called_once()
+            # Verify load_csv was called
+            # Since we use temp file, we just check called
+            assert MockLitStudy.load_csv.called
 
     def test_handles_missing_columns(self):
         df = pd.DataFrame({"title": ["A"]})
         with patch("pipeline.synthesis.litstudy") as MockLitStudy:
             convert_to_litstudy(df)
-            MockLitStudy.load_pandas.assert_called_once()
+            assert MockLitStudy.load_csv.called
 
 
 # ── generate_report ───────────────────────────────────────────────────

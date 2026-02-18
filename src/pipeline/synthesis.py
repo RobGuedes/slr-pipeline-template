@@ -25,22 +25,11 @@ def convert_to_litstudy(df: pd.DataFrame) -> "DocumentSet":
     LitStudy expects specific columns. We map our canonical columns to what
     LitStudy's `load_pandas` or internal structure expects.
     """
+    import tempfile
+    import os
 
-    # LitStudy's load_pandas expects a DataFrame where columns match specific names
-    # or it tries to guess.
-    # Our columns: author, title, year, source_title, doi, cited_by, abstract
-    # LitStudy useful columns: Authors, Title, Year, Source title, DOI, Cited by
-    
-    # We create a copy with "LitStudy-friendly" column names if needed.
-    # Actually, litstudy.load_pandas is flexible.
-    # Let's try passing directly, but ensuring keys exist.
-    
-    # We can also construct DocumentSet directly from a list of dicts if needed,
-    # but load_pandas is idiomatic.
-    
-    # Helper to format authors list string "Smith, J.; Doe, A." -> ["Smith, J.", "Doe, A."]
-    # Our 'author' column from ingest is just the raw string (e.g. "Smith, J.; Doe, A.").
-    # LitStudy parses this string if we tell it the column name.
+    # LitStudy doesn't support load_pandas directly.
+    # We save to a temporary CSV and load it back using load_csv.
     
     # Rename to standard bibliometric fields usually works best
     mapping = {
@@ -56,9 +45,18 @@ def convert_to_litstudy(df: pd.DataFrame) -> "DocumentSet":
     # Create mapped dataframe
     df_lit = df.rename(columns=mapping)
     
-    # Pass to LitStudy
-    # It might warn about missing columns, but basic plots should work.
-    docs = litstudy.load_pandas(df_lit)
+    # Use temporary file
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
+        df_lit.to_csv(tmp, index=False)
+        tmp_path = tmp.name
+        
+    try:
+        # load_csv is generic
+        docs = litstudy.load_csv(tmp_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            
     return docs
 
 

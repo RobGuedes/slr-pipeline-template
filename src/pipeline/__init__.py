@@ -1,2 +1,4 @@
-# src/pipeline/__init__.py
-# Empty — agents build this
+from .config import PipelineConfig
+from .runner import run_pipeline
+
+__all__ = ["PipelineConfig", "run_pipeline"]
