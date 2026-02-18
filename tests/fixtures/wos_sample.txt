@@ -1,0 +1,4 @@
+PT	AU	TI	SO	DT	DE	AB	DI	PY	TC	UT
+J	Kim E; Park F	Machine learning for asset allocation	Quantitative Finance	Article	machine learning; asset allocation	We study machine learning approaches for asset allocation in modern portfolios.	10.1000/test.004	2023	30	WOS:000000000000001
+J	Smith A; Jones B	Portfolio optimization with deep learning	Journal of Finance	Article	deep learning; portfolio	This paper explores deep learning for portfolio optimization.	10.1000/test.001	2023	20	WOS:000000000000002
+J	Zhang G	Review of quantitative methods	Finance Review	Review	quantitative methods; review	A comprehensive review of quantitative methods.	10.1000/test.005	2022	12	WOS:000000000000003
