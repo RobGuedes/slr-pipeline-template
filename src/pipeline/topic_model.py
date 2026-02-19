@@ -28,6 +28,7 @@ class SweepResult:
 def perform_lda_sweep(
     corpus: list[list[tuple[int, int]]],
     id2word: Dictionary,
+    texts: list[list[str]],
     k_values: list[int],
     passes: int = 10,
     random_state: int = 42,
@@ -42,6 +43,8 @@ def perform_lda_sweep(
         Gensim BoW corpus.
     id2word : Dictionary
         Gensim dictionary mapping.
+    texts : list[list[str]]
+        Tokenized documents (required for c_v coherence).
     k_values : list[int]
         List of topic counts (K) to try.
     passes : int
@@ -61,7 +64,6 @@ def perform_lda_sweep(
     results: list[SweepResult] = []
 
     for k in k_values:
-        # Train LDA
         model = LdaModel(
             corpus=corpus,
             id2word=id2word,
@@ -72,22 +74,13 @@ def perform_lda_sweep(
             eta=eta,
         )
 
-        # Compute Coherence
-        # c_v is the most popular metric, though u_mass is faster.
-        # Legacy notebook used c_v (implied, or default).
         coherence_model = CoherenceModel(
             model=model,
-            corpus=corpus,
+            texts=texts,
             dictionary=id2word,
-            coherence="u_mass"  # u_mass is faster and uses corpus, c_v needs texts
+            coherence="c_v",
         )
-        # Note: If we want c_v, we need the tokenized texts, not just corpus.
-        # For now, using u_mass as it only requires corpus/dictionary.
-        # If legacy used c_v, we'd need to pass `texts` argument.
-        # Let's check legacy notebook...
-        # Legacy used pyLDAvis which often implies c_v or u_mass analysis?
-        # Safe default is u_mass for speed and simplicity here.
-        
+
         score = coherence_model.get_coherence()
         perplexity = model.log_perplexity(corpus)
         results.append(SweepResult(k=k, coherence=score, perplexity=perplexity, model=model))
