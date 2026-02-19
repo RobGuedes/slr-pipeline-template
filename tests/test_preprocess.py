@@ -26,33 +26,65 @@ class TestCleanText:
         setup_nltk()
 
     def test_lowercases(self):
-        assert clean_text("Hello World") == ["hello", "world"]
+        tokens = clean_text("Hello World")
+        assert "hello" in tokens
+        assert "world" in tokens
 
     def test_removes_punctuation(self):
-        assert clean_text("hello, world!") == ["hello", "world"]
+        # RegexpTokenizer(r'\w+') splits on non-word chars
+        tokens = clean_text("hello, world!")
+        assert "hello" in tokens
+        assert "world" in tokens
+        assert "," not in tokens
 
-    def test_removes_numbers(self):
-        assert clean_text("hello 123 world") == ["hello", "world"]
+    def test_keeps_digits_in_words(self):
+        # RegexpTokenizer keeps 'lstm2', 't5' etc.
+        tokens = clean_text("lstm2 model works")
+        assert "lstm2" in tokens
 
-    def test_lemmatizes(self):
-        # Default WordNetLemmatizer treats words as nouns.
-        # "cats" -> "cat"
-        res = clean_text("cats")
-        assert "cat" in res
+    def test_lemmatizes_verbs_with_pos(self):
+        # POS-aware: "running" (verb) -> "run"
+        tokens = clean_text("The cats are running quickly")
+        assert "cat" in tokens
+        assert "run" in tokens
+
+    def test_lemmatizes_nouns(self):
+        # "studies" -> "study" (noun), "cats" -> "cat" (noun)
+        tokens = clean_text("multiple studies about cats")
+        assert "study" in tokens
+        assert "cat" in tokens
 
     def test_removes_stopwords(self):
-        # "the" is a standard stopword
-        assert clean_text("the cat") == ["cat"]
+        tokens = clean_text("the cat sat on the mat")
+        assert "the" not in tokens
+        assert "cat" in tokens
 
     def test_removes_short_tokens(self):
-        # "is", "a" are sort, "go" is 2 chars.
-        assert clean_text("ab cde") == ["cde"]
+        # Tokens with len <= 2 are removed after lemmatization
+        tokens = clean_text("ab cde fg")
+        assert "ab" not in tokens
+        assert "fg" not in tokens
+        assert "cde" in tokens
+
+    def test_deduplicates_tokens_per_document(self):
+        # Same word repeated should appear only once
+        tokens = clean_text("model model model training model")
+        assert tokens.count("model") == 1
+
+    def test_dedup_preserves_order(self):
+        # First occurrence order should be preserved
+        tokens = clean_text("alpha beta alpha gamma beta")
+        assert tokens.index("alpha") < tokens.index("beta")
+        assert tokens.index("beta") < tokens.index("gamma")
 
     def test_handles_empty(self):
         assert clean_text("") == []
 
+    def test_handles_none_like(self):
+        assert clean_text("   ") == []
+
     def test_return_type_is_list(self):
-        assert isinstance(clean_text("test"), list)
+        assert isinstance(clean_text("test something here"), list)
 
 
 # ── create_corpus ─────────────────────────────────────────────────────

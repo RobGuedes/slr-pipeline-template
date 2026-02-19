@@ -6,13 +6,13 @@ corpus creation (Gensim).
 
 from __future__ import annotations
 
-import re
-import warnings
+from collections import OrderedDict
 
 import nltk
 from gensim.corpora import Dictionary
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, wordnet
 from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.tokenize import RegexpTokenizer
 from unidecode import unidecode
 
 
@@ -39,15 +39,32 @@ def setup_nltk() -> None:
         nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 
 
-def clean_text(text: str) -> list[str]:
-    """Clean, tokenize, and lemmatize a single document string.
+# Module-level tokenizer instance (stateless, safe to reuse)
+_tokenizer = RegexpTokenizer(r"\w+")
 
-    Pipeline:
+
+def _get_wordnet_pos(tag: str) -> str:
+    """Map NLTK POS tag to WordNet POS for lemmatization."""
+    if tag.startswith("J"):
+        return wordnet.ADJ
+    elif tag.startswith("V"):
+        return wordnet.VERB
+    elif tag.startswith("R"):
+        return wordnet.ADV
+    else:
+        return wordnet.NOUN
+
+
+def clean_text(text: str) -> list[str]:
+    """Clean, tokenize, POS-lemmatize, and deduplicate a single document.
+
+    Pipeline (matches legacy notebook methodology):
     1. Lowercase & unidecode (remove accents)
-    2. Keep only alphanumeric chars (remove punctuation/numbers)
+    2. Tokenize with RegexpTokenizer(r'\\w+')
     3. Remove stopwords
-    4. Lemmatize (nouns, verbs)
-    5. Remove short tokens (< 3 chars)
+    4. POS-tag and lemmatize with correct part-of-speech
+    5. Remove duplicate tokens (preserve first-occurrence order)
+    6. Remove short tokens (len <= 2)
 
     Parameters
     ----------
@@ -57,7 +74,7 @@ def clean_text(text: str) -> list[str]:
     Returns
     -------
     list[str]
-        List of cleaned tokens.
+        List of cleaned, unique tokens.
     """
     if not isinstance(text, str) or not text.strip():
         return []
@@ -65,24 +82,25 @@ def clean_text(text: str) -> list[str]:
     # 1. Normalize
     text = unidecode(text).lower()
 
-    # 2. Tokenize (keep only words)
-    # Legacy used: re.sub('[^a-zA-Z]', ' ', text) then split
-    # We'll use a regex tokenizer for better control
-    tokens = re.findall(r"\b[a-z]{2,}\b", text)
+    # 2. Tokenize (keeps digits-in-words like lstm2, t5)
+    tokens = _tokenizer.tokenize(text)
 
     # 3. Stopwords
     stops = set(stopwords.words("english"))
-    # Add custom stopwords from legacy if needed (none explicit in scan)
     tokens = [t for t in tokens if t not in stops]
 
-    # 4. Lemmatize
+    # 4. POS-aware lemmatization
     lemmatizer = WordNetLemmatizer()
-    # NLTK lemmatize defaults to noun (n). Legacy likely used default.
-    # We'll do noun then verb for better coverage, or just noun?
-    # Legacy notebook: `lemma = WordNetLemmatizer(); lemma.lemmatize(word)` -> noun default
-    tokens = [lemmatizer.lemmatize(t) for t in tokens]
+    pos_tags = nltk.pos_tag(tokens)
+    tokens = [
+        lemmatizer.lemmatize(token, _get_wordnet_pos(tag))
+        for token, tag in pos_tags
+    ]
 
-    # 5. Length check (legacy implicit in some regexes, we explicit > 2)
+    # 5. Deduplicate (preserve order)
+    tokens = list(OrderedDict.fromkeys(tokens))
+
+    # 6. Length filter
     tokens = [t for t in tokens if len(t) > 2]
 
     return tokens
