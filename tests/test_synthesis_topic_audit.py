@@ -17,10 +17,10 @@ from pipeline.synthesis import plot_topic_audit
 def mock_sweep_results():
     """Create a list of dummy SweepResult objects for testing."""
     return [
-        SweepResult(k=2, coherence=0.35, perplexity=-7.0, model=MagicMock()),
-        SweepResult(k=3, coherence=0.42, perplexity=-6.5, model=MagicMock()),
-        SweepResult(k=4, coherence=0.50, perplexity=-6.8, model=MagicMock()),
-        SweepResult(k=5, coherence=0.48, perplexity=-6.4, model=MagicMock()),
+        SweepResult(k=2, coherence=0.35, perplexity=-7.0),
+        SweepResult(k=3, coherence=0.42, perplexity=-6.5),
+        SweepResult(k=4, coherence=0.50, perplexity=-6.8),
+        SweepResult(k=5, coherence=0.48, perplexity=-6.4),
     ]
 
 
