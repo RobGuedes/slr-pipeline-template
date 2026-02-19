@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from pipeline.config import PipelineConfig
 from pipeline.ingest import ingest_all
 from pipeline.preprocess import setup_nltk, clean_text, create_corpus
-from pipeline.topic_model import perform_lda_sweep, train_final_model
+from pipeline.topic_model import perform_lda_sweep, train_final_model, select_top_candidates
 from pipeline.topic_identify import get_all_topic_labels
 from pipeline.topic_select import assign_dominant_topic, filter_documents
 from pipeline.quality_review import export_for_review
@@ -90,10 +90,47 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     logger.info(f"Generating topic audit plot at {audit_plot_path}...")
     plot_topic_audit(sweep_results, audit_plot_path)
 
-    # Simple logic to pick best K: max coherence
-    best_result = max(sweep_results, key=lambda x: x.coherence)
-    optimal_k = best_result.k
-    logger.info(f"Optimal K found: {optimal_k} (Coherence: {best_result.coherence:.4f})")
+    # Identify top candidate Ks
+    candidates = select_top_candidates(sweep_results, n=3)
+    valid_ks = {r.k for r in sweep_results}
+    best_k = candidates[0].k
+
+    # Present candidates to user
+    print("\n══════════════════════════════════════════════════")
+    print("Top K candidates (ranked by coherence):\n")
+    print(f"  {'Rank':>4} │ {'K':>3} │ {'Coherence':>9} │ {'Log Perplexity':>14}")
+    print(f"  {'─' * 4}─┼─{'─' * 3}─┼─{'─' * 9}─┼─{'─' * 14}")
+    for i, c in enumerate(candidates, 1):
+        print(f"  {i:>4} │ {c.k:>3} │ {c.coherence:>9.4f} │ {c.perplexity:>14.3f}")
+    print(f"\n  Audit plot saved to: {audit_plot_path}")
+    print("══════════════════════════════════════════════════\n")
+
+    # Prompt user for K selection
+    attempts = 0
+    optimal_k = best_k
+    while attempts < 3:
+        raw = input(f"Select K [default={best_k}]: ").strip()
+        if raw == "":
+            optimal_k = best_k
+            break
+        try:
+            chosen = int(raw)
+            if chosen in valid_ks:
+                optimal_k = chosen
+                break
+            else:
+                print(f"  Invalid: K={chosen} not in sweep range. Valid: {sorted(valid_ks)}")
+        except ValueError:
+            print(f"  Invalid input. Enter a number.")
+        attempts += 1
+    else:
+        logger.warning(f"Max attempts reached. Using best K={best_k}.")
+        optimal_k = best_k
+
+    selected_coherence = next(
+        r.coherence for r in sweep_results if r.k == optimal_k
+    )
+    logger.info(f"Selected K={optimal_k} (Coherence: {selected_coherence:.4f})")
     
     # ── Step 5: Final Model ────────────────────────────────────────────
     logger.info(f"Training final model with K={optimal_k}...")
