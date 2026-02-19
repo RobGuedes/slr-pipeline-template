@@ -1,39 +1,39 @@
 ## **3\. Methodology**
 
-This study falls under the category of a testing stand-alone review, as classified by Xiao & Watson (2017), and is characterized by the predominant use of statistical analyses. To achieve the research objective, the literature review was conducted in nine distinct steps, adapted from the methodologies proposed by Xiao & Watson (2017) and Asmussen & Møller (2019). These steps are illustrated in Figure 1 and grouped into three main phases: planning, execution, and reporting.  
+This study follows the structure of a standalone systematic literature review, as classified by Xiao & Watson (2017), relying primarily on computational text analysis. The review was conducted in nine distinct steps, adapted from the methodologies proposed by Xiao & Watson (2017) and Asmussen & Møller (2019), grouped into three phases: planning, execution, and reporting (Figure 1). Steps 1 and 2 are performed manually by the researcher; steps 3 through 9 are executed using a Python pipeline developed for this purpose.
 
-### *3.1. Formulation*
+### **3.1. Formulation**
 
-As discussed in Chapter 2, portfolio optimization represents a prominent research topic in both academic literature and the financial industry, with growing adoption and development of techniques to enhance performance. The research problem was framed as follows: “What optimization methods can lead to allocative efficiency in investment portfolios?” To address this question, a systematic literature review was conducted with the aim of identifying techniques that have demonstrated superior performance in portfolio management.
+The research problem and scope are defined by the researcher, including the central research question, relevant subquestions, and the conceptual boundaries of the review domain. This step produces the rationale for all subsequent methodological choices.
 
-### *3.2. Protocol development*
+### **3.2. Protocol Development**
 
-The protocol for this systematic literature review was designed to ensure unbiased execution and methodological rigor across all stages. Inclusion and exclusion criteria, search parameters, and procedures for data collection, analysis, and synthesis were established. Inspired by the methodologies of Xiao & Watson (2017) and Asmussen & Møller (2019), the protocol sought to achieve both comprehensive coverage and data manageability by defining databases, keywords, and evaluation criteria. All data processing and analysis were performed using Python version 3.12.
+A review protocol is designed to ensure unbiased and reproducible execution across all stages. The protocol defines inclusion and exclusion criteria, search databases, keyword combinations, and thresholds for data filtering. It also specifies the time range of publications to be retrieved from each database. All data processing and analysis are performed using Python 3.13.
 
-### *3.3. Literature search*
+### **3.3. Literature Search**
 
-Data collection was conducted using Scopus and Web of Science, targeting primarily peer-reviewed journal articles in English, while excluding conference papers, book chapters, and other non-journal sources. Keywords and phrases were combined using Boolean operators to create multiple search queries, which were executed concurrently to facilitate preprocessing. Duplicate records from both databases were identified and removed using the ScientoPy library (RuizRosero et al., 2019). To limit the results to a manageable number, the search was refined iteratively, including filtering publications from 2019 onwards.
+Data collection is conducted using Scopus and Web of Science (WoS). Searches target peer-reviewed journal articles in English, excluding conference papers, book chapters, and other non-journal sources, unless otherwise specified in the protocol. Keywords are combined using Boolean operators to form search queries, which are executed in each database independently. The resulting exports — CSV files from Scopus and tab-delimited TXT files from WoS — are loaded, merged, and deduplicated by the pipeline. Deduplication applies two complementary strategies: exact DOI matching (for records with a valid DOI) and normalized title combined with first-author surname matching (for records without a DOI or with conflicting identifiers). When duplicates are found, the citation count is averaged across the duplicate records. The temporal scope of the search is defined in the protocol (step 3.2) and applied at the database query stage, not by the pipeline.
 
-### *3.4. Preprocessing*
+### **3.4. Preprocessing**
 
-The preprocessing phase utilized the NLTK library for tasks such as partof-speech tagging, tokenization, lemmatization, and importing stopwords (Bird et al.). TF-IDF vectorization was performed using the Scikit-learn library, ensuring that the text data were adequately prepared for analysis (Pedregosa et al., 2011).
+The preprocessing phase prepares document text for topic modeling. The pipeline concatenates each document's title and abstract into a single text field. Preprocessing is performed using the NLTK library (Bird et al.) and includes: Unicode normalization, lowercasing, tokenization using a word-boundary regular expression, English stopword removal, part-of-speech tagging, and WordNet lemmatization with POS-aware morphological reduction. Duplicate tokens within a document are removed to reduce repetition bias, and tokens shorter than three characters are discarded. The resulting token sequences are used to construct a Gensim dictionary and bag-of-words corpus. Vocabulary is further filtered by removing tokens that appear in fewer than five documents or in more than 50% of the corpus.
 
-### *3.5. Topic modeling*
+### **3.5. Topic Modeling**
 
-Latent Dirichlet Allocation (LDA\[GA3\] ), as described by Blei et al. (2003) and Guindani et al. (2024), was employed for topic modeling. Abstracts were preprocessed and analyzed using the Gensim library, with coherence and perplexity scores calculated for topic numbers ranging from 2 to 15 Reh˚uˇrek & Sojka (2010). To enhance reproducibilityˇ and minimize variability, all LDA models were executed with 20 passes over the corpus and a fixed random seed. The optimal number of topics was determined based on coherence and perplexity scores. Topic visualizations, including multidimensional maps and salient term associations, were generated using the pyLDAvis library (Sievert & Shirley, 2014).
+Latent Dirichlet Allocation (LDA), as described by Blei et al. (2003), is employed for topic modeling using the Gensim library (Řehůřek & Sojka, 2010). Coherence (c\_v) and log-perplexity scores are computed for models trained across a range of topic counts K (default: 2 to 15). All sweep models are trained with a fixed random seed to ensure reproducibility. Coherence and perplexity curves are saved as a diagnostic chart, and the top candidate values of K are presented to the researcher, who selects the optimal K prior to final model training.
 
-### *3.6. Topic identification*
+### **3.6. Topic Identification**
 
-To ensure accuracy, the number of passes over the corpus was increased to 40 for final LDA runs. The top 10 most important terms for each topic, along with their respective weights, were extracted. The o1-preview generative AI model from OpenAI was employed to propose topic labels based on these terms (OpenAI, 2024).
+The final LDA model is trained with an increased number of passes (default: 40\) over the corpus to improve convergence. The top 10 most important terms and their associated weights are extracted for each topic. The researcher is responsible for inspecting these terms — together with the interactive topic map generated in step 3.9 — and assigning a descriptive label to each topic. An LLM (e.g., OpenAI ChatGPT 5.2, Claude Sonnet. 4.6, Gemini 3 Pro) may be used as an aid to propose label candidates based on the extracted terms; however, final label assignment is a human decision.
 
-### *3.7. Topic selection*
+### **3.7. Topic Selection**
 
-Topics generated in the previous step were evaluated by the authors to determine their relevance to the research objectives. Documents were retained within each topic if their probability of belonging to the topic exceeded 70% and if they had at least 15 citations. This filtering process ensured the inclusion of highly relevant and impactful documents.
+Topics identified in step 3.6 are evaluated by the researcher for relevance to the research question, using the pyLDAvis interactive topic map as the primary visual tool. For each retained topic, the pipeline assigns a dominant topic and a membership probability to every document. Documents are retained if their probability of belonging to the dominant topic exceeds a configurable threshold (default: 70%) and if they have accumulated at least a configurable minimum number of citations (default: 10). Per-topic citation thresholds may be set independently to account for variation in topic maturity or citation norms.
 
-### *3.8. Quality assessment*
+### **3.8. Quality Assessment**
 
-As an additional quality control measure, the abstracts of all selected documents were individually reviewed to validate the quantitative text-mining selections made in earlier stages.
+As an additional quality control measure, the pipeline exports the filtered document set to a CSV file with a `Keep` column for manual annotation. The researcher reviews the abstract of each selected document and marks it for retention or rejection. The pipeline then loads the annotated file and carries forward only the documents confirmed by the researcher. This step validates the quantitative text-mining selections made in earlier stages.
 
-### *3.9. Synthesis*
+### **3.9. Synthesis**
 
-Global characteristics of the dataset, such as trends in the number of annual publications, authors with the highest number of publications, and countries and institutions with significant representation, were analyzed using the ScientoPy (Ruiz-Rosero et al., 2019\) and LitStudy libraries (Heldens et al., 2022). Furthermore, the selected articles within each topic were examined to identify portfolio optimization methods and their respective performance outcomes.
+Global bibliometric characteristics of the confirmed document set are analyzed using the LitStudy library (Heldens et al., 2022), including trends in annual publications, authors with the highest number of publications, and countries and institutions with significant representation. An interactive multidimensional topic map is generated using the pyLDAvis library (Sievert & Shirley, 2014), enabling visual exploration of topic relationships and salient term associations. Per-topic synthesis — identifying domain-specific findings, methods, and performance outcomes within each topic cluster — is performed manually by the researcher using the confirmed documents as input.
