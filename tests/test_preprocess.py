@@ -6,6 +6,16 @@ from gensim.corpora import Dictionary
 from pipeline.preprocess import clean_text, create_corpus, setup_nltk
 
 
+# ── setup_nltk ─────────────────────────────────────────────────────────
+
+
+def test_setup_nltk_downloads_pos_tagger():
+    """setup_nltk should make POS tagger available."""
+    setup_nltk()
+    import nltk
+    nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+
+
 # ── clean_text ────────────────────────────────────────────────────────
 
 

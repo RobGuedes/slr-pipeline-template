@@ -33,6 +33,11 @@ def setup_nltk() -> None:
     except LookupError:
         nltk.download("omw-1.4", quiet=True)
 
+    try:
+        nltk.data.find("taggers/averaged_perceptron_tagger_eng")
+    except LookupError:
+        nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+
 
 def clean_text(text: str) -> list[str]:
     """Clean, tokenize, and lemmatize a single document string.
