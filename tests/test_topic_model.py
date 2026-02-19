@@ -118,6 +118,19 @@ class TestPerformLdaSweep:
         assert results[1].perplexity == -6.5
 
 
+# ── SweepResult ───────────────────────────────────────────────────────
+
+
+class TestSweepResult:
+    def test_sweep_result_stores_metrics_only(self):
+        """SweepResult should NOT store the full LdaModel object."""
+        result = SweepResult(k=5, coherence=0.42, perplexity=-7.1)
+        assert result.k == 5
+        assert result.coherence == 0.42
+        assert result.perplexity == -7.1
+        assert not hasattr(result, "model")
+
+
 # ── train_final_model ─────────────────────────────────────────────────
 
 

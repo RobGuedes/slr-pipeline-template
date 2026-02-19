@@ -18,11 +18,10 @@ if TYPE_CHECKING:
 @dataclass
 class SweepResult:
     """Result of a single LDA run during the parameter sweep."""
-    
+
     k: int
     coherence: float
     perplexity: float
-    model: LdaModel
 
 
 def perform_lda_sweep(
@@ -83,7 +82,7 @@ def perform_lda_sweep(
 
         score = coherence_model.get_coherence()
         perplexity = model.log_perplexity(corpus)
-        results.append(SweepResult(k=k, coherence=score, perplexity=perplexity, model=model))
+        results.append(SweepResult(k=k, coherence=score, perplexity=perplexity))
 
     return results
 
