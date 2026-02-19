@@ -79,9 +79,10 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     sweep_results = perform_lda_sweep(
         corpus=corpus,
         id2word=dictionary,
+        texts=tokens,
         k_values=list(range(*config.topic_range)),
         passes=config.num_passes_sweep,
-        random_state=config.random_state
+        random_state=config.random_state,
     )
     
     # Generate topic audit plot (perplexity + coherence vs K)
