@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from gensim.corpora import Dictionary
 from gensim.models import CoherenceModel, LdaModel
-from pipeline.topic_model import perform_lda_sweep, train_final_model, SweepResult
+from pipeline.topic_model import perform_lda_sweep, select_top_candidates, train_final_model, SweepResult
 from pipeline.config import PipelineConfig
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -129,6 +129,46 @@ class TestSweepResult:
         assert result.coherence == 0.42
         assert result.perplexity == -7.1
         assert not hasattr(result, "model")
+
+
+# ── select_top_candidates ─────────────────────────────────────────────
+
+
+class TestSelectTopCandidates:
+    def test_returns_top_n_by_coherence(self):
+        """Top 3 from 5 results, sorted by coherence descending."""
+        results = [
+            SweepResult(k=2, coherence=0.30, perplexity=-7.0),
+            SweepResult(k=3, coherence=0.50, perplexity=-6.5),
+            SweepResult(k=4, coherence=0.45, perplexity=-6.8),
+            SweepResult(k=5, coherence=0.60, perplexity=-6.2),
+            SweepResult(k=6, coherence=0.40, perplexity=-6.9),
+        ]
+        top = select_top_candidates(results, n=3)
+        assert len(top) == 3
+        assert top[0].k == 5   # highest coherence
+        assert top[1].k == 3   # second
+        assert top[2].k == 4   # third
+
+    def test_returns_all_if_fewer_than_n(self):
+        """If only 2 results exist, return both (don't crash)."""
+        results = [
+            SweepResult(k=2, coherence=0.30, perplexity=-7.0),
+            SweepResult(k=3, coherence=0.50, perplexity=-6.5),
+        ]
+        top = select_top_candidates(results, n=3)
+        assert len(top) == 2
+        assert top[0].k == 3
+        assert top[1].k == 2
+
+    def test_default_n_is_3(self):
+        """Verify default n=3 without passing argument."""
+        results = [
+            SweepResult(k=i, coherence=i * 0.1, perplexity=-7.0)
+            for i in range(2, 8)
+        ]
+        top = select_top_candidates(results)
+        assert len(top) == 3
 
 
 # ── train_final_model ─────────────────────────────────────────────────

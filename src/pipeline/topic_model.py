@@ -24,6 +24,21 @@ class SweepResult:
     perplexity: float
 
 
+def select_top_candidates(
+    sweep_results: list[SweepResult], n: int = 3
+) -> list[SweepResult]:
+    """Return the top N sweep results ranked by coherence descending.
+
+    Args:
+        sweep_results: Full list of sweep results from perform_lda_sweep.
+        n: Number of candidates to return.
+
+    Returns:
+        Top N results sorted by coherence (highest first).
+    """
+    return sorted(sweep_results, key=lambda r: r.coherence, reverse=True)[:n]
+
+
 def perform_lda_sweep(
     corpus: list[list[tuple[int, int]]],
     id2word: Dictionary,
