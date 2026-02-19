@@ -1,7 +1,7 @@
-# SLR Pipeline Refactoring
+# SLR Pipeline
 
 ## Objective
-Refactor legacy ScientoPy code and Jupyter notebooks into a single, clean,
+Refactor of past works using legacy ScientoPy (https://github.com/jpruiz84/scientopy) and LitStudy (https://github.com/NLeSC/litstudy) into a single, clean,
 tested Python pipeline that executes a systematic literature review methodology.
 
 ## Context
