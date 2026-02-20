@@ -6,6 +6,7 @@ the minimum probability or citation thresholds (globally or per-topic).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -108,6 +109,83 @@ def compute_top_sources(df: pd.DataFrame, n: int = 15) -> list[str]:
 
     counts = df["source_title"].dropna().value_counts()
     return counts.head(n).index.tolist()
+
+
+def recover_recent_papers(
+    df: pd.DataFrame,
+    config: "PipelineConfig",
+    top_authors: list[str],
+    top_sources: list[str],
+) -> pd.DataFrame:
+    """Recover recent papers that were rejected by the strict citation filter.
+
+    Second pass of the two-pass filter. Scans rejected papers and returns
+    those meeting age-based recency criteria.
+
+    Age brackets:
+    - < recent_threshold_years: 0 citations OK if author or source is relevant
+    - recent_threshold_years to < mid_range_threshold_years: >= mid_range_min_citations
+    - >= mid_range_threshold_years: not recovered (strict filter handles these)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Rejected papers (those that did NOT pass the strict filter).
+    config : PipelineConfig
+        Configuration with recency thresholds.
+    top_authors : list[str]
+        Top N authors by paper count (from full dataset).
+    top_sources : list[str]
+        Top N publication sources by paper count (from full dataset).
+
+    Returns
+    -------
+    pd.DataFrame
+        Papers recovered by recency criteria.
+    """
+    if not config.recency_filter_enabled or df.empty:
+        return df.iloc[0:0].copy()
+
+    ref_year = config.reference_year if config.reference_year is not None else datetime.now().year
+
+    # Drop rows with missing year — cannot determine age
+    has_year = df["year"].notna()
+    df_valid = df[has_year].copy()
+    if df_valid.empty:
+        return df.iloc[0:0].copy()
+
+    age = ref_year - df_valid["year"].astype(int)
+
+    # Bracket 1: recent (< recent_threshold_years)
+    recent_mask = age < config.recent_threshold_years
+    if top_authors or top_sources:
+        top_authors_set = set(top_authors)
+        top_sources_set = set(top_sources)
+
+        def _has_top_author(authors_str: str) -> bool:
+            if pd.isna(authors_str):
+                return False
+            return any(
+                a.strip() in top_authors_set
+                for a in str(authors_str).split(";")
+            )
+
+        author_relevant = df_valid["author"].apply(_has_top_author) if top_authors_set else pd.Series(False, index=df_valid.index)
+        source_relevant = df_valid["source_title"].isin(top_sources_set) if top_sources_set else pd.Series(False, index=df_valid.index)
+        relevance_mask = author_relevant | source_relevant
+    else:
+        relevance_mask = pd.Series(False, index=df_valid.index)
+
+    recent_recovered = recent_mask & relevance_mask
+
+    # Bracket 2: mid-range (recent_threshold to < mid_range_threshold)
+    mid_mask = (age >= config.recent_threshold_years) & (age < config.mid_range_threshold_years)
+    mid_citation_ok = df_valid["cited_by"] >= config.mid_range_min_citations
+    mid_recovered = mid_mask & mid_citation_ok
+
+    # Union
+    recovery_mask = recent_recovered | mid_recovered
+    return df_valid[recovery_mask].copy()
 
 
 def filter_documents(

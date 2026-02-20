@@ -9,6 +9,7 @@ from pipeline.topic_select import (
     filter_documents,
     compute_top_authors,
     compute_top_sources,
+    recover_recent_papers,
 )
 from pipeline.config import PipelineConfig
 
@@ -160,3 +161,162 @@ class TestComputeTopSources:
         df = pd.DataFrame({"source_title": [None, "J1", "J1"]})
         top = compute_top_sources(df, n=5)
         assert "J1" in top
+
+
+# ── recover_recent_papers ─────────────────────────────────────────────
+
+
+class TestRecoverRecentPapers:
+    """Test the second-pass recency recovery logic."""
+
+    def _make_config(self, **overrides):
+        defaults = dict(
+            min_topic_prob=0.0,
+            min_citations=10,
+            recency_filter_enabled=True,
+            recent_threshold_years=2,
+            mid_range_threshold_years=6,
+            mid_range_min_citations=5,
+            reference_year=2026,
+        )
+        defaults.update(overrides)
+        return PipelineConfig(**defaults)
+
+    def test_recovers_recent_paper_by_top_author(self):
+        """< 2 years, 0 citations, author in top-15 → recovered."""
+        df = pd.DataFrame({
+            "year": [2025],
+            "cited_by": [0],
+            "author": ["Smith, J."],
+            "source_title": ["Obscure Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        top_authors = ["Smith, J."]
+        top_sources = []
+        result = recover_recent_papers(df, self._make_config(), top_authors, top_sources)
+        assert len(result) == 1
+
+    def test_recovers_recent_paper_by_top_source(self):
+        """< 2 years, 0 citations, source in top-15 → recovered."""
+        df = pd.DataFrame({
+            "year": [2025],
+            "cited_by": [0],
+            "author": ["Nobody, X."],
+            "source_title": ["Top Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        top_authors = []
+        top_sources = ["Top Journal"]
+        result = recover_recent_papers(df, self._make_config(), top_authors, top_sources)
+        assert len(result) == 1
+
+    def test_rejects_recent_paper_without_relevance(self):
+        """< 2 years, 0 citations, neither top author nor source → not recovered."""
+        df = pd.DataFrame({
+            "year": [2025],
+            "cited_by": [0],
+            "author": ["Nobody, X."],
+            "source_title": ["Obscure Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), [], [])
+        assert len(result) == 0
+
+    def test_recovers_mid_range_paper_with_enough_citations(self):
+        """2-6 years, citations >= mid_range_min → recovered."""
+        df = pd.DataFrame({
+            "year": [2022],
+            "cited_by": [5],
+            "author": ["Nobody, X."],
+            "source_title": ["Any Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), [], [])
+        assert len(result) == 1
+
+    def test_rejects_mid_range_paper_with_few_citations(self):
+        """2-6 years, citations < mid_range_min → not recovered."""
+        df = pd.DataFrame({
+            "year": [2022],
+            "cited_by": [2],
+            "author": ["Nobody, X."],
+            "source_title": ["Any Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), [], [])
+        assert len(result) == 0
+
+    def test_does_not_recover_old_papers(self):
+        """≥ 6 years, even with many citations → not recovered (strict filter handles these)."""
+        df = pd.DataFrame({
+            "year": [2018],
+            "cited_by": [50],
+            "author": ["Smith, J."],
+            "source_title": ["Top Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), ["Smith, J."], ["Top Journal"])
+        assert len(result) == 0
+
+    def test_handles_missing_year(self):
+        """Papers with no year are not recovered."""
+        df = pd.DataFrame({
+            "year": [None],
+            "cited_by": [0],
+            "author": ["Smith, J."],
+            "source_title": ["Top Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), ["Smith, J."], ["Top Journal"])
+        assert len(result) == 0
+
+    def test_multiauthor_match(self):
+        """Any author matching top-15 qualifies the paper."""
+        df = pd.DataFrame({
+            "year": [2025],
+            "cited_by": [0],
+            "author": ["Nobody, X.; Smith, J.; Other, Y."],
+            "source_title": ["Obscure Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        result = recover_recent_papers(df, self._make_config(), ["Smith, J."], [])
+        assert len(result) == 1
+
+    def test_disabled_returns_empty(self):
+        """When recency_filter_enabled=False, nothing is recovered."""
+        df = pd.DataFrame({
+            "year": [2025],
+            "cited_by": [0],
+            "author": ["Smith, J."],
+            "source_title": ["Top Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        cfg = self._make_config(recency_filter_enabled=False)
+        result = recover_recent_papers(df, cfg, ["Smith, J."], ["Top Journal"])
+        assert len(result) == 0
+
+    def test_reference_year_defaults_to_current_year(self):
+        """When reference_year is None, uses datetime.now().year."""
+        from datetime import datetime
+        current_year = datetime.now().year
+        df = pd.DataFrame({
+            "year": [current_year],
+            "cited_by": [0],
+            "author": ["Smith, J."],
+            "source_title": ["Top Journal"],
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.8],
+        })
+        cfg = self._make_config(reference_year=None)
+        result = recover_recent_papers(df, cfg, ["Smith, J."], ["Top Journal"])
+        # age = 0, which is < 2 → recent bracket, top author → recovered
+        assert len(result) == 1
