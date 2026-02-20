@@ -6,7 +6,6 @@ import pytest
 
 from pipeline.config import PipelineConfig
 
-
 # ── Defaults ──────────────────────────────────────────────────────────
 
 
@@ -111,3 +110,36 @@ class TestEffectiveMinCitations:
         )
         assert cfg.effective_min_citations(0) == 10
         assert cfg.effective_min_citations(1) == 20
+
+
+# ── Recency filter defaults ────────────────────────────────────────────
+
+
+class TestRecencyDefaults:
+    def test_recency_filter_enabled_by_default(self):
+        cfg = PipelineConfig()
+        assert cfg.recency_filter_enabled is True
+
+    def test_recent_threshold_years_default(self):
+        cfg = PipelineConfig()
+        assert cfg.recent_threshold_years == 2
+
+    def test_mid_range_threshold_years_default(self):
+        cfg = PipelineConfig()
+        assert cfg.mid_range_threshold_years == 6
+
+    def test_mid_range_min_citations_default(self):
+        cfg = PipelineConfig()
+        assert cfg.mid_range_min_citations == 5
+
+    def test_top_n_authors_default(self):
+        cfg = PipelineConfig()
+        assert cfg.top_n_authors == 15
+
+    def test_top_n_sources_default(self):
+        cfg = PipelineConfig()
+        assert cfg.top_n_sources == 15
+
+    def test_reference_year_none_by_default(self):
+        cfg = PipelineConfig()
+        assert cfg.reference_year is None

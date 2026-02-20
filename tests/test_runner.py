@@ -15,7 +15,6 @@ from pipeline.config import PipelineConfig
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.convert_to_litstudy")
 @patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
@@ -25,17 +24,29 @@ from pipeline.config import PipelineConfig
 @patch("pipeline.runner.get_all_topic_labels")
 @patch("builtins.input", return_value="")
 def test_end_to_end_flow(
-    mock_input, mock_labels, mock_export_review, mock_plot_biblio, mock_plot_audit,
-    mock_plot, mock_tex, mock_report, mock_litstudy, mock_filter, mock_assign,
-    mock_train, mock_top_candidates, mock_sweep, mock_corpus, mock_clean, mock_ingest
+    mock_input,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_report,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
 ):
     """Verify the sequence of steps in the pipeline."""
 
     # Setup mocks
-    mock_ingest.return_value = pd.DataFrame({
-        "title": ["Paper A"],
-        "abstract": ["Abstract of paper A"]
-    })
+    mock_ingest.return_value = pd.DataFrame(
+        {"title": ["Paper A"], "abstract": ["Abstract of paper A"]}
+    )
     mock_corpus.return_value = (MagicMock(name="dictionary"), MagicMock(name="corpus"))
 
     # Sweep returns optimal k=5
@@ -65,7 +76,6 @@ def test_end_to_end_flow(
     mock_train.assert_called_once()
     mock_assign.assert_called_once()
     mock_filter.assert_called_once()
-    mock_litstudy.assert_called_once()
     mock_plot.assert_called_once()
     mock_report.assert_called_once()
 
@@ -78,7 +88,6 @@ def test_end_to_end_flow(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.convert_to_litstudy")
 @patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
@@ -88,17 +97,29 @@ def test_end_to_end_flow(
 @patch("pipeline.runner.get_all_topic_labels")
 @patch("builtins.input", return_value="3")
 def test_interactive_k_selection(
-    mock_input, mock_labels, mock_export_review, mock_plot_biblio,
-    mock_plot_audit, mock_plot, mock_tex, mock_report, mock_litstudy,
-    mock_filter, mock_assign, mock_train, mock_top_candidates, mock_sweep,
-    mock_corpus, mock_clean, mock_ingest
+    mock_input,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_report,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
 ):
     """Pipeline prompts user and trains model with chosen K."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame({
-        "title": ["Paper A"], "abstract": ["Abstract A"]
-    })
+    mock_ingest.return_value = pd.DataFrame(
+        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
     all_results = [
@@ -134,7 +155,6 @@ def test_interactive_k_selection(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.convert_to_litstudy")
 @patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
@@ -144,17 +164,29 @@ def test_interactive_k_selection(
 @patch("pipeline.runner.get_all_topic_labels")
 @patch("builtins.input", return_value="")
 def test_empty_input_uses_default_best_k(
-    mock_input, mock_labels, mock_export_review, mock_plot_biblio,
-    mock_plot_audit, mock_plot, mock_tex, mock_report, mock_litstudy,
-    mock_filter, mock_assign, mock_train, mock_top_candidates, mock_sweep,
-    mock_corpus, mock_clean, mock_ingest
+    mock_input,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_report,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
 ):
     """Empty input (just Enter) should use the default best K."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame({
-        "title": ["Paper A"], "abstract": ["Abstract A"]
-    })
+    mock_ingest.return_value = pd.DataFrame(
+        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
     mock_sweep.return_value = [
@@ -184,7 +216,6 @@ def test_empty_input_uses_default_best_k(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.convert_to_litstudy")
 @patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
@@ -194,17 +225,29 @@ def test_empty_input_uses_default_best_k(
 @patch("pipeline.runner.get_all_topic_labels")
 @patch("builtins.input", side_effect=["99", "3"])
 def test_invalid_then_valid_k_selection(
-    mock_input, mock_labels, mock_export_review, mock_plot_biblio,
-    mock_plot_audit, mock_plot, mock_tex, mock_report, mock_litstudy,
-    mock_filter, mock_assign, mock_train, mock_top_candidates, mock_sweep,
-    mock_corpus, mock_clean, mock_ingest
+    mock_input,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_report,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
 ):
     """First attempt enters K not in sweep range; second attempt succeeds."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame({
-        "title": ["Paper A"], "abstract": ["Abstract A"]
-    })
+    mock_ingest.return_value = pd.DataFrame(
+        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
     mock_sweep.return_value = [
@@ -234,7 +277,6 @@ def test_invalid_then_valid_k_selection(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.convert_to_litstudy")
 @patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
@@ -244,17 +286,29 @@ def test_invalid_then_valid_k_selection(
 @patch("pipeline.runner.get_all_topic_labels")
 @patch("builtins.input", side_effect=["bad", "99", "nope"])
 def test_exhausted_attempts_fall_back_to_best_k(
-    mock_input, mock_labels, mock_export_review, mock_plot_biblio,
-    mock_plot_audit, mock_plot, mock_tex, mock_report, mock_litstudy,
-    mock_filter, mock_assign, mock_train, mock_top_candidates, mock_sweep,
-    mock_corpus, mock_clean, mock_ingest
+    mock_input,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_report,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
 ):
     """Three invalid inputs exhaust the retry loop; default K is used."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame({
-        "title": ["Paper A"], "abstract": ["Abstract A"]
-    })
+    mock_ingest.return_value = pd.DataFrame(
+        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
     mock_sweep.return_value = [
