@@ -15,7 +15,7 @@ import pyLDAvis.gensim_models
 
 if TYPE_CHECKING:
     from gensim.corpora import Dictionary
-    from gensim.models import LdaModel  # noqa: F401
+    from gensim.models import LdaModel
 
 
 def _plot_horizontal_bar(
@@ -38,6 +38,7 @@ def _plot_horizontal_bar(
         Where to save the PNG.
     """
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -51,7 +52,6 @@ def _plot_horizontal_bar(
     plt.tight_layout()
     fig.savefig(str(output_path), dpi=150)
     plt.close(fig)
-
 
 
 def generate_report(df: pd.DataFrame) -> dict[str, Any]:
@@ -72,7 +72,7 @@ def generate_report(df: pd.DataFrame) -> dict[str, Any]:
             "total_papers": 0,
             "min_year": None,
             "max_year": None,
-            "total_citations": 0
+            "total_citations": 0,
         }
 
     return {
@@ -127,7 +127,7 @@ def plot_topics(
     model: LdaModel,
     corpus: list[list[tuple[int, int]]],
     dictionary: Dictionary,
-    output_path: Path | str
+    output_path: Path | str,
 ) -> None:
     """Generate interactive pyLDAvis plot and save to HTML.
 
@@ -147,10 +147,10 @@ def plot_topics(
     vis_data = pyLDAvis.gensim_models.prepare(
         model, corpus, dictionary, sort_topics=False
     )
-    
+
     # Ensure parent directory exists
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Save to HTML
     pyLDAvis.save_html(vis_data, str(output_path))
 
@@ -174,12 +174,13 @@ def plot_topic_audit(
         Where to save the PNG chart.
     """
     import matplotlib
-    matplotlib.use("Agg")          # non-interactive backend
+
+    matplotlib.use("Agg")  # non-interactive backend
     import matplotlib.pyplot as plt
 
-    k_values      = [r.k for r in sweep_results]
-    perplexities  = [r.perplexity for r in sweep_results]
-    coherences    = [r.coherence for r in sweep_results]
+    k_values = [r.k for r in sweep_results]
+    perplexities = [r.perplexity for r in sweep_results]
+    coherences = [r.coherence for r in sweep_results]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
@@ -221,6 +222,7 @@ def plot_bibliometrics(
     - top_affiliations.png   (horizontal bars)
     """
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -251,7 +253,9 @@ def plot_bibliometrics(
         if authors:
             author_counts = pd.Series(authors).value_counts().head(15)
             _plot_horizontal_bar(
-                author_counts, "No. of documents", "Top 15 Authors",
+                author_counts,
+                "No. of documents",
+                "Top 15 Authors",
                 out / "top_authors.png",
             )
 
@@ -260,7 +264,9 @@ def plot_bibliometrics(
         source_counts = df["source_title"].dropna().value_counts().head(15)
         if not source_counts.empty:
             _plot_horizontal_bar(
-                source_counts, "No. of documents", "Top 15 Publication Sources",
+                source_counts,
+                "No. of documents",
+                "Top 15 Publication Sources",
                 out / "top_sources.png",
             )
 
@@ -276,7 +282,9 @@ def plot_bibliometrics(
         if countries:
             country_counts = pd.Series(countries).value_counts().head(20)
             _plot_horizontal_bar(
-                country_counts, "No. of documents", "Top 20 Countries",
+                country_counts,
+                "No. of documents",
+                "Top 20 Countries",
                 out / "top_countries.png",
             )
 
@@ -292,6 +300,8 @@ def plot_bibliometrics(
         if institutions:
             inst_counts = pd.Series(institutions).value_counts().head(20)
             _plot_horizontal_bar(
-                inst_counts, "No. of documents", "Top 20 Affiliations",
+                inst_counts,
+                "No. of documents",
+                "Top 20 Affiliations",
                 out / "top_affiliations.png",
             )

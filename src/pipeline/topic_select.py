@@ -7,7 +7,7 @@ the minimum probability or citation thresholds (globally or per-topic).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -40,17 +40,17 @@ def assign_dominant_topic(
         DataFrame with added columns.
     """
     df_out = df.copy()
-    
+
     # Pre-allocate lists for speed
     dom_topics = []
     perc_contribs = []
-    
+
     # Helper to get topics safely
     def get_topics(bow: list[tuple[int, int]]) -> list[tuple[int, float]]:
         try:
-            # minimum_probability=0 ensures all topics are returned? 
+            # minimum_probability=0 ensures all topics are returned?
             # Or use None to get only significant ones.
-            # We want the max, so default behavior is usually fine, 
+            # We want the max, so default behavior is usually fine,
             # but if no topics returned (empty doc), we handle it.
             return model.get_document_topics(bow, minimum_probability=0.0)
         except Exception:
@@ -62,17 +62,17 @@ def assign_dominant_topic(
             dom_topics.append(-1)
             perc_contribs.append(0.0)
             continue
-            
+
         # Sort by probability descending
         topics.sort(key=lambda x: x[1], reverse=True)
         top_topic, top_prob = topics[0]
-        
+
         dom_topics.append(int(top_topic))
         perc_contribs.append(float(top_prob))
-        
+
     df_out["Dominant_Topic"] = dom_topics
     df_out["Perc_Contribution"] = perc_contribs
-    
+
     return df_out
 
 
@@ -146,7 +146,11 @@ def recover_recent_papers(
     if not config.recency_filter_enabled or df.empty:
         return df.iloc[0:0].copy()
 
-    ref_year = config.reference_year if config.reference_year is not None else datetime.now().year
+    ref_year = (
+        config.reference_year
+        if config.reference_year is not None
+        else datetime.now().year
+    )
 
     # Drop rows with missing year — cannot determine age
     has_year = df["year"].notna()
@@ -166,12 +170,19 @@ def recover_recent_papers(
             if pd.isna(authors_str):
                 return False
             return any(
-                a.strip() in top_authors_set
-                for a in str(authors_str).split(";")
+                a.strip() in top_authors_set for a in str(authors_str).split(";")
             )
 
-        author_relevant = df_valid["author"].apply(_has_top_author) if top_authors_set else pd.Series(False, index=df_valid.index)
-        source_relevant = df_valid["source_title"].isin(top_sources_set) if top_sources_set else pd.Series(False, index=df_valid.index)
+        author_relevant = (
+            df_valid["author"].apply(_has_top_author)
+            if top_authors_set
+            else pd.Series(False, index=df_valid.index)
+        )
+        source_relevant = (
+            df_valid["source_title"].isin(top_sources_set)
+            if top_sources_set
+            else pd.Series(False, index=df_valid.index)
+        )
         relevance_mask = author_relevant | source_relevant
     else:
         relevance_mask = pd.Series(False, index=df_valid.index)
@@ -179,7 +190,9 @@ def recover_recent_papers(
     recent_recovered = recent_mask & relevance_mask
 
     # Bracket 2: mid-range (recent_threshold to < mid_range_threshold)
-    mid_mask = (age >= config.recent_threshold_years) & (age < config.mid_range_threshold_years)
+    mid_mask = (age >= config.recent_threshold_years) & (
+        age < config.mid_range_threshold_years
+    )
     mid_citation_ok = df_valid["cited_by"] >= config.mid_range_min_citations
     mid_recovered = mid_mask & mid_citation_ok
 
