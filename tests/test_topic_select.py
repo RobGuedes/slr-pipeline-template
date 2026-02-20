@@ -4,7 +4,12 @@ import pandas as pd
 import pytest
 from unittest.mock import MagicMock
 
-from pipeline.topic_select import assign_dominant_topic, filter_documents
+from pipeline.topic_select import (
+    assign_dominant_topic,
+    filter_documents,
+    compute_top_authors,
+    compute_top_sources,
+)
 from pipeline.config import PipelineConfig
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -103,3 +108,55 @@ class TestFilterDocuments:
         filtered = filter_documents(df, cfg)
         assert len(filtered) == 1
         assert filtered.iloc[0]["Dominant_Topic"] == 0
+
+
+# ── compute_top_authors ───────────────────────────────────────────────
+
+
+class TestComputeTopAuthors:
+    def test_returns_top_n_by_paper_count(self):
+        df = pd.DataFrame({
+            "author": [
+                "Smith, J.; Doe, A.",
+                "Smith, J.; Brown, B.",
+                "Doe, A.; Brown, B.",
+                "Smith, J.",
+            ]
+        })
+        top = compute_top_authors(df, n=2)
+        # Smith appears in 3 papers, Doe in 2, Brown in 2
+        assert top[0] == "Smith, J."
+        assert len(top) == 2
+
+    def test_handles_missing_author_column(self):
+        df = pd.DataFrame({"title": ["A"]})
+        top = compute_top_authors(df, n=5)
+        assert top == []
+
+    def test_handles_nan_authors(self):
+        df = pd.DataFrame({"author": [None, "Smith, J."]})
+        top = compute_top_authors(df, n=5)
+        assert "Smith, J." in top
+
+
+# ── compute_top_sources ───────────────────────────────────────────────
+
+
+class TestComputeTopSources:
+    def test_returns_top_n_by_paper_count(self):
+        df = pd.DataFrame({
+            "source_title": ["Journal A", "Journal A", "Journal B", "Journal C"]
+        })
+        top = compute_top_sources(df, n=2)
+        assert top[0] == "Journal A"
+        assert len(top) == 2
+
+    def test_handles_missing_source_column(self):
+        df = pd.DataFrame({"title": ["A"]})
+        top = compute_top_sources(df, n=5)
+        assert top == []
+
+    def test_handles_nan_sources(self):
+        df = pd.DataFrame({"source_title": [None, "J1", "J1"]})
+        top = compute_top_sources(df, n=5)
+        assert "J1" in top

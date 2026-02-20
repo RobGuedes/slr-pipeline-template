@@ -75,6 +75,41 @@ def assign_dominant_topic(
     return df_out
 
 
+def compute_top_authors(df: pd.DataFrame, n: int = 15) -> list[str]:
+    """Return the top *n* authors by paper count from the full dataset.
+
+    Authors are semicolon-separated in the ``author`` column.
+    Each author is stripped and counted individually.
+    """
+    if "author" not in df.columns:
+        return []
+
+    authors: list[str] = []
+    for raw in df["author"].dropna():
+        for name in str(raw).split(";"):
+            name = name.strip()
+            if name:
+                authors.append(name)
+
+    if not authors:
+        return []
+
+    counts = pd.Series(authors).value_counts()
+    return counts.head(n).index.tolist()
+
+
+def compute_top_sources(df: pd.DataFrame, n: int = 15) -> list[str]:
+    """Return the top *n* publication sources by paper count.
+
+    Uses the ``source_title`` column directly.
+    """
+    if "source_title" not in df.columns:
+        return []
+
+    counts = df["source_title"].dropna().value_counts()
+    return counts.head(n).index.tolist()
+
+
 def filter_documents(
     df: pd.DataFrame,
     config: "PipelineConfig"
