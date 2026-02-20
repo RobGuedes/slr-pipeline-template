@@ -6,7 +6,6 @@ import pytest
 
 from pipeline.config import PipelineConfig
 
-
 # ── Defaults ──────────────────────────────────────────────────────────
 
 
