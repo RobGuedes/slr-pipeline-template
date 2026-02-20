@@ -320,3 +320,53 @@ class TestRecoverRecentPapers:
         result = recover_recent_papers(df, cfg, ["Smith, J."], ["Top Journal"])
         # age = 0, which is < 2 → recent bracket, top author → recovered
         assert len(result) == 1
+
+
+# ── filter_documents integration with recovery ────────────────────────
+
+
+class TestFilterDocumentsWithRecovery:
+    """Integration test: strict filter + recency recovery."""
+
+    def test_recovers_recent_paper_rejected_by_strict_filter(self):
+        """A recent paper by a top author should survive the full filter."""
+        df = pd.DataFrame({
+            "Dominant_Topic": [0, 0, 0],
+            "Perc_Contribution": [0.9, 0.9, 0.9],
+            "cited_by": [50, 0, 3],
+            "year": [2015, 2025, 2023],
+            "author": ["Old, A.", "Smith, J.", "Mid, M."],
+            "source_title": ["J1", "J2", "J3"],
+        })
+        # full_df has Smith in top authors
+        full_df = pd.DataFrame({
+            "author": ["Smith, J."] * 20 + ["Other, X."] * 5,
+            "source_title": ["J2"] * 20 + ["J3"] * 5,
+        })
+        cfg = PipelineConfig(
+            min_topic_prob=0.0,
+            min_citations=10,
+            recency_filter_enabled=True,
+            reference_year=2026,
+            mid_range_min_citations=5,
+        )
+        result = filter_documents(df, cfg, full_df=full_df)
+        # Paper 0: 50 citations, old → passes strict filter
+        # Paper 1: 0 citations, recent, top author → recovered
+        # Paper 2: 3 citations, mid-range, < 5 → NOT recovered
+        assert len(result) == 2
+        assert set(result["author"]) == {"Old, A.", "Smith, J."}
+
+    def test_backward_compatible_without_full_df(self):
+        """When full_df is not provided, only strict filter applies (backward compat)."""
+        df = pd.DataFrame({
+            "Dominant_Topic": [0],
+            "Perc_Contribution": [0.9],
+            "cited_by": [0],
+            "year": [2025],
+            "author": ["Smith, J."],
+            "source_title": ["J1"],
+        })
+        cfg = PipelineConfig(min_topic_prob=0.0, min_citations=10)
+        result = filter_documents(df, cfg)
+        assert len(result) == 0  # strict filter rejects, no recovery without full_df

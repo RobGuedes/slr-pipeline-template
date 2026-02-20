@@ -190,7 +190,8 @@ def recover_recent_papers(
 
 def filter_documents(
     df: pd.DataFrame,
-    config: "PipelineConfig"
+    config: "PipelineConfig",
+    full_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Filter documents based on probability and citation count.
 
@@ -198,12 +199,18 @@ def filter_documents(
     1. Perc_Contribution >= config.min_topic_prob
     2. cited_by >= config.effective_min_citations(Dominant_Topic)
 
+    When *full_df* is provided and ``config.recency_filter_enabled`` is True,
+    a second recovery pass runs on rejected papers using age-based criteria.
+
     Parameters
     ----------
     df : pd.DataFrame
         DataFrame with "Dominant_Topic" and "Perc_Contribution".
     config : PipelineConfig
         Configuration with thresholds.
+    full_df : pd.DataFrame | None
+        Full dataset (before any filtering) used to compute top-15 authors
+        and sources for recency recovery. If None, recovery is skipped.
 
     Returns
     -------
@@ -214,29 +221,24 @@ def filter_documents(
         raise ValueError("DataFrame must have assigned dominant topics.")
 
     # 1. Filter by probability
-    # Using mask for efficiency
     prob_mask = df["Perc_Contribution"] >= config.min_topic_prob
-    
-    # 2. Filter by citations (per-topic adaptive)
-    # Vectorized approach is hard with per-topic config.
-    # Apply row-wise or simple map. Map is efficient.
-    
-    # Create a map of topic -> min_citations
-    # We don't know all topics in advance without model, but we know present topics
-    present_topics = df["Dominant_Topic"].unique()
-    
-    # If topic is -1 (failed), threshold doesn't matter, it's garbage.
-    # We should filter out -1 first?
+
+    # 2. Exclude documents that failed topic assignment
     valid_topic_mask = df["Dominant_Topic"] != -1
-    
-    # Calculate thresholds for each row
-    # This is fast enough for <10k rows.
-    # df.apply is slow, List comprehension is faster.
-    
+
+    # 3. Filter by citations (per-topic adaptive)
     min_citations = df["Dominant_Topic"].map(config.effective_min_citations)
     citation_mask = df["cited_by"] >= min_citations
-    
+
     # Combine masks
     final_mask = prob_mask & valid_topic_mask & citation_mask
-    
+
+    # 4. Optional second-pass recency recovery
+    if config.recency_filter_enabled and full_df is not None:
+        top_authors = compute_top_authors(full_df, config.top_n_authors)
+        top_sources = compute_top_sources(full_df, config.top_n_sources)
+        df_rejected = df[~final_mask]
+        recovered = recover_recent_papers(df_rejected, config, top_authors, top_sources)
+        return pd.concat([df[final_mask], recovered]).copy()
+
     return df[final_mask].copy()
