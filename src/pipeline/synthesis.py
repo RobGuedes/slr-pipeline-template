@@ -19,6 +19,41 @@ if TYPE_CHECKING:
     from litstudy import DocumentSet
 
 
+def _plot_horizontal_bar(
+    data: pd.Series,
+    xlabel: str,
+    title: str,
+    output_path: Path | str,
+) -> None:
+    """Render a horizontal bar chart with unified project styling.
+
+    Parameters
+    ----------
+    data : pd.Series
+        Index = labels, values = counts. Assumed already sorted/truncated.
+    xlabel : str
+        Label for the x-axis.
+    title : str
+        Chart title.
+    output_path : Path | str
+        Where to save the PNG.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    data.plot.barh(ax=ax, color="#4c72b0")
+    ax.set_xlabel(xlabel)
+    ax.set_title(title)
+    ax.invert_yaxis()
+    plt.tight_layout()
+    fig.savefig(str(output_path), dpi=150)
+    plt.close(fig)
+
+
 def convert_to_litstudy(df: pd.DataFrame) -> "DocumentSet":
     """Convert the pipeline DataFrame to a LitStudy DocumentSet for plotting.
 

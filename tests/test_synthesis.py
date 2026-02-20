@@ -1,10 +1,13 @@
 """Tests for pipeline.synthesis — reporting and visualization."""
 
+import tempfile
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
 
-from pipeline.synthesis import convert_to_litstudy, plot_topics, generate_report
+from pipeline.synthesis import convert_to_litstudy, plot_topics, generate_report, _plot_horizontal_bar
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -24,6 +27,26 @@ def sample_df():
         "publisher": ["Pub A", "Pub B"],
         "affiliation": ["Aff A", "Aff B"]
     })
+
+
+# ── _plot_horizontal_bar ──────────────────────────────────────────────
+
+
+class TestPlotHorizontalBar:
+    def test_creates_png_file(self):
+        data = pd.Series({"A": 10, "B": 5, "C": 3})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir) / "test.png"
+            _plot_horizontal_bar(data, "No. of documents", "Test Title", out)
+            assert out.exists()
+            assert out.stat().st_size > 0
+
+    def test_creates_parent_dirs(self):
+        data = pd.Series({"A": 10})
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir) / "nested" / "dir" / "test.png"
+            _plot_horizontal_bar(data, "No. of documents", "Test Title", out)
+            assert out.exists()
 
 
 # ── convert_to_litstudy ───────────────────────────────────────────────
