@@ -1,6 +1,7 @@
 """Step 9 — Synthesis: visualized analysis and reporting.
 
-Leverages LitStudy for bibliometric plots and pyLDAvis for interactive topic maps.
+Uses pyLDAvis for interactive topic maps and custom matplotlib helpers for
+bibliometric plots.
 """
 
 from __future__ import annotations
@@ -11,12 +12,10 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import pyLDAvis
 import pyLDAvis.gensim_models
-import litstudy
 
 if TYPE_CHECKING:
     from gensim.corpora import Dictionary
-    from gensim.models import LdaModel
-    from litstudy import DocumentSet
+    from gensim.models import LdaModel  # noqa: F401
 
 
 def _plot_horizontal_bar(
@@ -53,46 +52,6 @@ def _plot_horizontal_bar(
     fig.savefig(str(output_path), dpi=150)
     plt.close(fig)
 
-
-def convert_to_litstudy(df: pd.DataFrame) -> "DocumentSet":
-    """Convert the pipeline DataFrame to a LitStudy DocumentSet for plotting.
-
-    LitStudy expects specific columns. We map our canonical columns to what
-    LitStudy's `load_pandas` or internal structure expects.
-    """
-    import tempfile
-    import os
-
-    # LitStudy doesn't support load_pandas directly.
-    # We save to a temporary CSV and load it back using load_csv.
-    
-    # Rename to standard bibliometric fields usually works best
-    mapping = {
-        "author": "Authors",
-        "title": "Title",
-        "year": "Year",
-        "source_title": "Source title",
-        "doi": "DOI",
-        "cited_by": "Cited by",
-        "abstract": "Abstract"
-    }
-    
-    # Create mapped dataframe
-    df_lit = df.rename(columns=mapping)
-    
-    # Use temporary file
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
-        df_lit.to_csv(tmp, index=False)
-        tmp_path = tmp.name
-        
-    try:
-        # load_csv is generic
-        docs = litstudy.load_csv(tmp_path)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-            
-    return docs
 
 
 def generate_report(df: pd.DataFrame) -> dict[str, Any]:
@@ -247,86 +206,92 @@ def plot_topic_audit(
 
 def plot_bibliometrics(
     df: pd.DataFrame,
-    docs: "DocumentSet",
     output_dir: Path | str,
 ) -> None:
     """Generate bibliometric plots and save them to output_dir.
 
-    Uses LitStudy for year/author histograms (which parse correctly from CSV),
-    and parses countries/affiliations directly from the DataFrame's
-    ``Affiliations`` column (semicolon-separated entries where the last
-    comma-separated token is typically the country).
+    All plots use a unified visual identity. Horizontal bar charts use
+    ``_plot_horizontal_bar``; the publication years chart uses vertical bars.
 
     Plots generated:
-    - publication_years.png
-    - top_authors.png
-    - top_countries.png
-    - top_affiliations.png
+    - publication_years.png  (vertical bars)
+    - top_authors.png        (horizontal bars)
+    - top_sources.png        (horizontal bars)
+    - top_countries.png      (horizontal bars)
+    - top_affiliations.png   (horizontal bars)
     """
     import matplotlib
-    matplotlib.use("Agg")          # non-interactive backend
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Publication Years (via LitStudy) ────────────────────────
-    plt.figure(figsize=(10, 5))
-    litstudy.plot_year_histogram(docs)
-    plt.title("Publication Trends")
-    plt.tight_layout()
-    plt.savefig(out / "publication_years.png", dpi=150)
-    plt.close()
+    # ── 1. Publication Years (vertical bars) ────────────────────────
+    if "year" in df.columns and not df["year"].dropna().empty:
+        year_counts = df["year"].dropna().astype(int).value_counts().sort_index()
+        fig, ax = plt.subplots(figsize=(10, 5))
+        year_counts.plot.bar(ax=ax, color="#4c72b0")
+        ax.set_xlabel("Year")
+        ax.set_ylabel("No. of documents")
+        ax.set_title("Publication Trends")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        fig.savefig(out / "publication_years.png", dpi=150)
+        plt.close(fig)
 
-    # ── 2. Top Authors (via LitStudy) ──────────────────────────────
-    plt.figure(figsize=(10, 5))
-    litstudy.plot_author_histogram(docs, limit=20)
-    plt.title("Top 20 Authors")
-    plt.tight_layout()
-    plt.savefig(out / "top_authors.png", dpi=150)
-    plt.close()
+    # ── 2. Top Authors (horizontal bars) ────────────────────────────
+    if "author" in df.columns:
+        authors: list[str] = []
+        for raw in df["author"].dropna():
+            for name in str(raw).split(";"):
+                name = name.strip()
+                if name:
+                    authors.append(name)
+        if authors:
+            author_counts = pd.Series(authors).value_counts().head(15)
+            _plot_horizontal_bar(
+                author_counts, "No. of documents", "Top 15 Authors",
+                out / "top_authors.png",
+            )
 
-    # ── 3. Top Countries (parsed from DataFrame) ──────────────────
+    # ── 3. Top Publication Sources (horizontal bars) ────────────────
+    if "source_title" in df.columns:
+        source_counts = df["source_title"].dropna().value_counts().head(15)
+        if not source_counts.empty:
+            _plot_horizontal_bar(
+                source_counts, "No. of documents", "Top 15 Publication Sources",
+                out / "top_sources.png",
+            )
+
+    # ── 4. Top Countries (horizontal bars) ──────────────────────────
     aff_col = "Affiliations" if "Affiliations" in df.columns else "affiliations"
     if aff_col in df.columns:
         countries: list[str] = []
         for raw in df[aff_col].dropna():
-            # Each entry is semicolon-separated; last token after comma is country
             for entry in str(raw).split(";"):
                 parts = [p.strip() for p in entry.split(",")]
                 if parts:
                     countries.append(parts[-1])
-
         if countries:
             country_counts = pd.Series(countries).value_counts().head(20)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            country_counts.plot.barh(ax=ax, color="#4c72b0")
-            ax.set_xlabel("No. of documents")
-            ax.set_title("Top 20 Countries")
-            ax.invert_yaxis()
-            plt.tight_layout()
-            fig.savefig(out / "top_countries.png", dpi=150)
-            plt.close(fig)
+            _plot_horizontal_bar(
+                country_counts, "No. of documents", "Top 20 Countries",
+                out / "top_countries.png",
+            )
 
-    # ── 4. Top Affiliations / Institutions (parsed from DataFrame) ─
+    # ── 5. Top Affiliations (horizontal bars) ───────────────────────
     if aff_col in df.columns:
         institutions: list[str] = []
         for raw in df[aff_col].dropna():
             for entry in str(raw).split(";"):
                 parts = [p.strip() for p in entry.split(",")]
-                # Prefer the 2nd token (university) over the 1st (department);
-                # fall back to the 1st if there is only one token.
                 inst = parts[1] if len(parts) >= 2 else parts[0] if parts else ""
                 if inst:
                     institutions.append(inst)
-
         if institutions:
             inst_counts = pd.Series(institutions).value_counts().head(20)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            inst_counts.plot.barh(ax=ax, color="#4c72b0")
-            ax.set_xlabel("No. of documents")
-            ax.set_title("Top 20 Affiliations")
-            ax.invert_yaxis()
-            plt.tight_layout()
-            fig.savefig(out / "top_affiliations.png", dpi=150)
-            plt.close(fig)
+            _plot_horizontal_bar(
+                inst_counts, "No. of documents", "Top 20 Affiliations",
+                out / "top_affiliations.png",
+            )

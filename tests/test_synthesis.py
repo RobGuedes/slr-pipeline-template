@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
 
-from pipeline.synthesis import convert_to_litstudy, plot_topics, generate_report, _plot_horizontal_bar
+from pipeline.synthesis import plot_topics, generate_report, _plot_horizontal_bar, plot_bibliometrics
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -49,28 +49,6 @@ class TestPlotHorizontalBar:
             assert out.exists()
 
 
-# ── convert_to_litstudy ───────────────────────────────────────────────
-
-
-class TestConvertToLitStudy:
-    def test_returns_document_set(self, sample_df):
-        # We need to mock litstudy.DocumentSet or litstudy.load_pandas
-        # Since we use pandas internally, we'll try to rely on litstudy's real
-        # object if installed, or mock it if dependencies are heavy.
-        # Patch litstudy module imported in synthesis.py
-        with patch("pipeline.synthesis.litstudy") as MockLitStudy:
-            docs = convert_to_litstudy(sample_df)
-            # Verify load_csv was called
-            # Since we use temp file, we just check called
-            assert MockLitStudy.load_csv.called
-
-    def test_handles_missing_columns(self):
-        df = pd.DataFrame({"title": ["A"]})
-        with patch("pipeline.synthesis.litstudy") as MockLitStudy:
-            convert_to_litstudy(df)
-            assert MockLitStudy.load_csv.called
-
-
 # ── generate_report ───────────────────────────────────────────────────
 
 
@@ -98,3 +76,55 @@ class TestPlotTopics:
         
         mock_prepare.assert_called_once()
         mock_save.assert_called_once()
+
+
+# ── plot_bibliometrics ────────────────────────────────────────────────
+
+
+class TestPlotBibliometrics:
+    @pytest.fixture
+    def sample_biblio_df(self):
+        return pd.DataFrame({
+            "year": [2020, 2021, 2022, 2020, 2021],
+            "author": [
+                "Smith, J.; Doe, A.",
+                "Smith, J.",
+                "Brown, B.",
+                "Doe, A.",
+                "Smith, J.; Brown, B.",
+            ],
+            "source_title": ["J1", "J2", "J1", "J3", "J1"],
+            "Affiliations": [
+                "Dept A, Uni X, USA",
+                "Dept B, Uni Y, UK",
+                "Dept C, Uni X, USA",
+                None,
+                "Dept D, Uni Z, Brazil",
+            ],
+        })
+
+    def test_creates_all_plot_files(self, sample_biblio_df):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plot_bibliometrics(sample_biblio_df, Path(tmpdir))
+            assert (Path(tmpdir) / "publication_years.png").exists()
+            assert (Path(tmpdir) / "top_authors.png").exists()
+            assert (Path(tmpdir) / "top_sources.png").exists()
+            assert (Path(tmpdir) / "top_countries.png").exists()
+            assert (Path(tmpdir) / "top_affiliations.png").exists()
+
+    def test_no_docs_parameter_required(self, sample_biblio_df):
+        """Verify plot_bibliometrics no longer requires a DocumentSet."""
+        import inspect
+        sig = inspect.signature(plot_bibliometrics)
+        param_names = list(sig.parameters.keys())
+        assert "docs" not in param_names
+
+    def test_handles_empty_dataframe(self):
+        df = pd.DataFrame({
+            "year": pd.Series(dtype=int),
+            "author": pd.Series(dtype=str),
+            "source_title": pd.Series(dtype=str),
+        })
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Should not raise
+            plot_bibliometrics(df, Path(tmpdir))

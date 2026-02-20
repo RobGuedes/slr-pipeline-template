@@ -22,7 +22,6 @@ from pipeline.topic_identify import get_all_topic_labels
 from pipeline.topic_select import assign_dominant_topic, filter_documents
 from pipeline.quality_review import export_for_review
 from pipeline.synthesis import (
-    convert_to_litstudy,
     generate_report,
     export_report_tex,
     plot_topics,
@@ -155,7 +154,7 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Map topic IDs to labels for readability? 
     # Usually we keep ID for processing, map for display.
     
-    df_selected = filter_documents(df_topics, config)
+    df_selected = filter_documents(df_topics, config, full_df=df_topics)
     logger.info(f"Selected {len(df_selected)} documents after filtering.")
     
     # ── Step 8: Quality Review Export ──────────────────────────────────
@@ -175,17 +174,9 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     logger.info(f"Exporting synthesis report to {tex_path}...")
     export_report_tex(stats, tex_path)
     
-    # 2. LitStudy conversion (demo)
-    try:
-        docs_lit = convert_to_litstudy(df_selected)
-        logger.info(f"Converted to LitStudy DocumentSet with {len(docs_lit)} docs.")
-        
-        # Generate bibliometric plots
-        logger.info("Generating bibliometric plots (trends, authors, affiliations)...")
-        plot_bibliometrics(df_selected, docs_lit, config.processed_dir)
-        
-    except ImportError:
-        logger.warning("LitStudy not installed, skipping advanced bibliometrics.")
+    # 2. Bibliometric plots
+    logger.info("Generating bibliometric plots...")
+    plot_bibliometrics(df_selected, config.processed_dir)
         
     # 3. Topic Plot
     plot_path = config.processed_dir / "topic_plot.html"
