@@ -36,6 +36,21 @@ class PipelineConfig:
         Global default minimum citation count for topic selection (Step 7).
     min_citations_per_topic : dict[int, int] | None
         Per-topic overrides for ``min_citations``, e.g. ``{2: 15}``.
+    recency_filter_enabled : bool
+        Enable age-aware citation recovery in Step 7 (default: True).
+    recent_threshold_years : int
+        Papers younger than this (in years) qualify for the recent bracket.
+    mid_range_threshold_years : int
+        Papers between recent_threshold_years and this qualify for mid-range
+        recovery if they have enough citations.
+    mid_range_min_citations : int
+        Minimum citations required for mid-range recovery.
+    top_n_authors : int
+        Number of top authors (by paper count) used for recency recovery.
+    top_n_sources : int
+        Number of top sources (by paper count) used for recency recovery.
+    reference_year : int | None
+        Year used as "now" when computing paper age. Defaults to current year.
     """
 
     # ── Paths ──────────────────────────────────────────────────────
@@ -61,6 +76,15 @@ class PipelineConfig:
     min_topic_prob: float = 0.7
     min_citations: int = 10
     min_citations_per_topic: dict[int, int] | None = field(default=None)
+
+    # ── Recency-aware citation recovery (Step 7) ────────────────
+    recency_filter_enabled: bool = True
+    recent_threshold_years: int = 2
+    mid_range_threshold_years: int = 6
+    mid_range_min_citations: int = 5
+    top_n_authors: int = 15
+    top_n_sources: int = 15
+    reference_year: int | None = None
 
     # ── Helpers ────────────────────────────────────────────────────
 
