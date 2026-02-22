@@ -274,34 +274,61 @@ def plot_bibliometrics(
     aff_col = "Affiliations" if "Affiliations" in df.columns else "affiliations"
     if aff_col in df.columns:
         countries: list[str] = []
+        import re
         for raw in df[aff_col].dropna():
-            for entry in str(raw).split(";"):
-                parts = [p.strip() for p in entry.split(",")]
+            cleaned = re.sub(r'\[.*?\]', '', str(raw))
+            for entry in cleaned.split(";"):
+                parts = [p.strip() for p in entry.split(",") if p.strip()]
                 if parts:
-                    countries.append(parts[-1])
+                    country_raw = parts[-1]
+                    c_up = country_raw.upper()
+                    if "USA" in c_up or "UNITED STATES" in c_up:
+                        country = "USA"
+                    elif "CHINA" in c_up:
+                        country = "China"
+                    elif "UK" in c_up or "ENGLAND" in c_up:
+                        country = "UK"
+                    else:
+                        # Try to remove numbers (e.g., zip codes)
+                        words = [w for w in country_raw.split() if not any(c.isdigit() for c in w)]
+                        country = " ".join(words)
+                    
+                    if country:
+                        countries.append(country)
         if countries:
-            country_counts = pd.Series(countries).value_counts().head(20)
+            country_counts = pd.Series(countries).value_counts().head(15)
             _plot_horizontal_bar(
                 country_counts,
                 "No. of documents",
-                "Top 20 Countries",
+                "Top 15 Countries",
                 out / "top_countries.png",
             )
 
     # ── 5. Top Affiliations (horizontal bars) ───────────────────────
     if aff_col in df.columns:
         institutions: list[str] = []
-        for raw in df[aff_col].dropna():
-            for entry in str(raw).split(";"):
-                parts = [p.strip() for p in entry.split(",")]
-                inst = parts[1] if len(parts) >= 2 else parts[0] if parts else ""
-                if inst:
-                    institutions.append(inst)
+        has_source = "source_db" in df.columns
+        iterator = df[["source_db", aff_col]].dropna(subset=[aff_col]).itertuples() if has_source else df[[aff_col]].dropna().itertuples()
+        
+        for row in iterator:
+            raw = getattr(row, aff_col)
+            source = getattr(row, "source_db", "Unknown")
+            cleaned = re.sub(r'\[.*?\]', '', str(raw))
+            for entry in cleaned.split(";"):
+                parts = [p.strip() for p in entry.split(",") if p.strip()]
+                if parts:
+                    if source == "Scopus":
+                        inst = parts[1] if len(parts) >= 2 else parts[0]
+                    else:
+                        inst = parts[0]
+                    
+                    if inst:
+                        institutions.append(inst)
         if institutions:
-            inst_counts = pd.Series(institutions).value_counts().head(20)
+            inst_counts = pd.Series(institutions).value_counts().head(15)
             _plot_horizontal_bar(
                 inst_counts,
                 "No. of documents",
-                "Top 20 Affiliations",
+                "Top 15 Affiliations",
                 out / "top_affiliations.png",
             )

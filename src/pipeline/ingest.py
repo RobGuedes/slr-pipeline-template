@@ -28,6 +28,7 @@ _CANONICAL = (
     "author_keywords",
     "source_title",
     "source_db",
+    "affiliations",
 )
 
 # ── Scopus → canonical mapping ────────────────────────────────────────
@@ -41,6 +42,7 @@ _SCOPUS_MAP = {
     "Document Type": "document_type",
     "Author Keywords": "author_keywords",
     "Source title": "source_title",
+    "Affiliations": "affiliations",
 }
 
 # ── WoS → canonical mapping ──────────────────────────────────────────
@@ -54,6 +56,7 @@ _WOS_MAP = {
     "DT": "document_type",
     "DE": "author_keywords",
     "SO": "source_title",
+    "C1": "affiliations",
 }
 
 
