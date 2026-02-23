@@ -51,6 +51,14 @@ class PipelineConfig:
         Number of top sources (by paper count) used for recency recovery.
     reference_year : int | None
         Year used as "now" when computing paper age. Defaults to current year.
+    academic_stopwords : tuple[str, ...]
+        Common academic terms removed during preprocessing. These words
+        appear in most papers regardless of topic and add noise to LDA.
+    domain_stopwords : tuple[str, ...]
+        User-supplied domain-specific stopwords (empty by default).
+        Set per-project for terms ubiquitous in your field.
+    nouns_only : bool
+        If True, keep only nouns after POS tagging (default: False).
     """
 
     # ── Paths ──────────────────────────────────────────────────────
@@ -85,6 +93,54 @@ class PipelineConfig:
     top_n_authors: int = 15
     top_n_sources: int = 15
     reference_year: int | None = None
+
+    # ── Preprocessing (Step 4) ────────────────────────────────────
+    academic_stopwords: tuple[str, ...] = (
+        "study",
+        "research",
+        "result",
+        "method",
+        "approach",
+        "analysis",
+        "finding",
+        "paper",
+        "propose",
+        "investigate",
+        "examine",
+        "evaluate",
+        "demonstrate",
+        "present",
+        "discuss",
+        "conclude",
+        "suggest",
+        "indicate",
+        "reveal",
+        "aim",
+        "objective",
+        "contribution",
+        "limitation",
+        "implication",
+        "hypothesis",
+        "conclusion",
+        "introduction",
+        "literature",
+        "review",
+        "methodology",
+        "framework",
+        "significant",
+        "significantly",
+        "respectively",
+        "furthermore",
+        "moreover",
+        "however",
+        "therefore",
+        "consequently",
+        "nevertheless",
+        "whereas",
+        "although",
+    )
+    domain_stopwords: tuple[str, ...] = ()
+    nouns_only: bool = False
 
     # ── Helpers ────────────────────────────────────────────────────
 

@@ -143,3 +143,23 @@ class TestRecencyDefaults:
     def test_reference_year_none_by_default(self):
         cfg = PipelineConfig()
         assert cfg.reference_year is None
+
+
+# ── Preprocessing defaults ─────────────────────────────────────────
+
+
+class TestPreprocessingDefaults:
+    def test_academic_stopwords_has_defaults(self):
+        config = PipelineConfig()
+        assert isinstance(config.academic_stopwords, tuple)
+        assert len(config.academic_stopwords) > 0
+        assert "study" in config.academic_stopwords
+        assert "research" in config.academic_stopwords
+
+    def test_domain_stopwords_empty_by_default(self):
+        config = PipelineConfig()
+        assert config.domain_stopwords == ()
+
+    def test_nouns_only_false_by_default(self):
+        config = PipelineConfig()
+        assert config.nouns_only is False
