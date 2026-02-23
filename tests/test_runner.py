@@ -452,7 +452,9 @@ def test_uses_existing_model_if_provided():
 @patch("pipeline.runner.plot_bibliometrics")
 @patch("pipeline.runner.export_for_review")
 @patch("pipeline.runner.get_all_topic_labels")
+@patch("pipeline.runner.export_topic_terms")
 def test_exports_synthesis_metadata_json(
+    mock_topic_terms,
     mock_labels,
     mock_export_review,
     mock_plot_biblio,

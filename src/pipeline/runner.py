@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import pandas as pd
+
 from pipeline.config import PipelineConfig
 from pipeline.ingest import ingest_all
 from pipeline.metrics import PipelineMetrics
@@ -164,8 +166,8 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Map topic IDs to labels for readability?
     # Usually we keep ID for processing, map for display.
 
-    # Count papers per topic
-    papers_per_topic = df_topics["Dominant_Topic"].value_counts().to_dict()
+    # Count papers per topic (exclude failed assignments with Dominant_Topic == -1)
+    papers_per_topic = df_topics[df_topics["Dominant_Topic"] >= 0]["Dominant_Topic"].value_counts().to_dict()
 
     df_selected, filter_stats = filter_documents(
         df_topics, config, full_df=df_topics, return_stats=True
@@ -195,8 +197,8 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
         papers_selected_strict=filter_stats["selected_strict"],
         papers_recovered=filter_stats["recovered"],
         papers_final=len(df_selected),
-        year_min=int(df_selected["year"].min()) if len(df_selected) > 0 else 0,
-        year_max=int(df_selected["year"].max()) if len(df_selected) > 0 else 0,
+        year_min=int(df_selected["year"].min()) if len(df_selected) > 0 and pd.notna(df_selected["year"].min()) else 0,
+        year_max=int(df_selected["year"].max()) if len(df_selected) > 0 and pd.notna(df_selected["year"].max()) else 0,
         total_citations=int(df_selected["cited_by"].sum()) if len(df_selected) > 0 else 0,
     )
 
