@@ -447,21 +447,17 @@ def test_uses_existing_model_if_provided():
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
 @patch("pipeline.runner.export_report_tex")
-@patch("pipeline.runner.export_report_json")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
 @patch("pipeline.runner.plot_bibliometrics")
 @patch("pipeline.runner.export_for_review")
 @patch("pipeline.runner.get_all_topic_labels")
-@patch("builtins.input", return_value="")
 def test_exports_synthesis_metadata_json(
-    mock_input,
     mock_labels,
     mock_export_review,
     mock_plot_biblio,
     mock_plot_audit,
     mock_plot,
-    mock_json,
     mock_tex,
     mock_filter,
     mock_assign,
@@ -472,9 +468,15 @@ def test_exports_synthesis_metadata_json(
     mock_clean,
     mock_ingest,
     tmp_path,
+    monkeypatch,
 ):
     """Verify runner exports synthesis_metadata.json."""
+    import json
     from pipeline.topic_model import SweepResult
+
+    # Mock user input for K selection
+    inputs = iter([""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     # Setup mocks
     mock_ingest.return_value = (
@@ -517,11 +519,18 @@ def test_exports_synthesis_metadata_json(
     mock_filter.return_value = (df_selected, filter_stats)
 
     # Run pipeline
-    cfg = PipelineConfig(raw_dir=tmp_path / "raw", processed_dir=tmp_path / "proc")
-    cfg.processed_dir.mkdir(parents=True, exist_ok=True)
-    run_pipeline(cfg)
+    config = PipelineConfig(raw_dir=tmp_path / "raw", processed_dir=tmp_path / "proc")
+    config.processed_dir.mkdir(parents=True, exist_ok=True)
+    run_pipeline(config)
 
-    # Verify export_report_json was called
-    mock_json.assert_called_once()
-    json_path = mock_json.call_args[0][1]
-    assert json_path == cfg.processed_dir / "synthesis_metadata.json"
+    # Verify JSON file was created with correct structure
+    json_path = config.processed_dir / "synthesis_metadata.json"
+    assert json_path.exists()
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    assert "ingestion" in data
+    assert "topic_modeling" in data
+    assert "filtering" in data
+    assert "final_dataset" in data
