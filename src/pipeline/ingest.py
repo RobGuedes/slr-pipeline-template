@@ -203,7 +203,11 @@ def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
 # ── Orchestrator ──────────────────────────────────────────────────────
 
 
-def ingest_all(raw_dir: Path, config: "PipelineConfig") -> pd.DataFrame:
+def ingest_all(
+    raw_dir: Path,
+    config: "PipelineConfig",
+    return_counts: bool = False,
+) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, int]]:
     """End-to-end ingestion: load every file in *raw_dir*, merge, filter, dedup.
 
     Parameters
@@ -212,20 +216,31 @@ def ingest_all(raw_dir: Path, config: "PipelineConfig") -> pd.DataFrame:
         Directory containing ``.csv`` (Scopus) and ``.txt`` (WoS) files.
     config : PipelineConfig
         Pipeline configuration (used for ``included_doc_types``).
+    return_counts : bool, optional
+        If True, return a tuple of (DataFrame, counts_dict).
+        counts_dict contains: scopus, wos, unique, duplicates_removed.
+        Default is False.
 
     Returns
     -------
-    pd.DataFrame
+    pd.DataFrame or tuple[pd.DataFrame, dict[str, int]]
         Clean, de-duplicated DataFrame ready for preprocessing.
+        If return_counts=True, returns (DataFrame, counts_dict).
     """
     frames: list[pd.DataFrame] = []
     raw = Path(raw_dir)
+    scopus_count = 0
+    wos_count = 0
 
     for f in sorted(raw.iterdir()):
         if f.suffix == ".csv":
-            frames.append(load_scopus_csv(f))
+            df = load_scopus_csv(f)
+            frames.append(df)
+            scopus_count += len(df)
         elif f.suffix == ".txt":
-            frames.append(load_wos_txt(f))
+            df = load_wos_txt(f)
+            frames.append(df)
+            wos_count += len(df)
 
     if not frames:
         msg = f"No CSV or TXT files found in {raw_dir}"
@@ -235,7 +250,20 @@ def ingest_all(raw_dir: Path, config: "PipelineConfig") -> pd.DataFrame:
 
     # Filter by document type
     merged = merged[merged["document_type"].isin(config.included_doc_types)]
+    pre_dedup_count = len(merged)
 
     # De-duplicate
     result = deduplicate(merged)
-    return result.reset_index(drop=True)
+    result = result.reset_index(drop=True)
+    unique_count = len(result)
+    duplicates_removed = pre_dedup_count - unique_count
+
+    if return_counts:
+        counts = {
+            "scopus": scopus_count,
+            "wos": wos_count,
+            "unique": unique_count,
+            "duplicates_removed": duplicates_removed,
+        }
+        return result, counts
+    return result
