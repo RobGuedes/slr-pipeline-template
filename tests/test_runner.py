@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from pipeline.runner import run_pipeline
 from pipeline.config import PipelineConfig
+from pipeline.preprocess import clean_text
 
 
 @patch("pipeline.runner.ingest_all")
@@ -536,3 +537,68 @@ def test_exports_synthesis_metadata_json(
     assert "topic_modeling" in data
     assert "filtering" in data
     assert "final_dataset" in data
+
+
+@patch("pipeline.runner.export_topic_terms")
+@patch("pipeline.runner.plot_bibliometrics")
+@patch("pipeline.runner.plot_topics")
+@patch("pipeline.runner.plot_topic_audit")
+@patch("pipeline.runner.export_for_review")
+@patch("pipeline.runner.assign_dominant_topic")
+@patch("pipeline.runner.train_final_model")
+@patch("pipeline.runner.perform_lda_sweep")
+@patch("pipeline.runner.create_corpus")
+@patch("pipeline.runner.filter_documents")
+@patch("pipeline.runner.ingest_all")
+def test_passes_stopwords_and_nouns_only_to_clean_text(
+    mock_ingest,
+    mock_filter,
+    mock_corpus,
+    mock_sweep,
+    mock_train,
+    mock_assign,
+    mock_review,
+    mock_audit,
+    mock_topics,
+    mock_biblio,
+    mock_topic_terms,
+    tmp_path,
+    monkeypatch,
+):
+    """Verify runner passes config stopwords and nouns_only to clean_text."""
+    cfg = PipelineConfig(raw_dir=tmp_path / "raw", processed_dir=tmp_path / "proc")
+    cfg.academic_stopwords = ("study",)
+    cfg.domain_stopwords = ("blockchain",)
+    cfg.nouns_only = True
+
+    # Setup mocks
+    df = pd.DataFrame({"title": ["test"], "abstract": ["test"], "year": [2020], "cited_by": [10]})
+    mock_ingest.return_value = (df, {"scopus": 1, "wos": 0, "unique": 1, "duplicates_removed": 0})
+    mock_corpus.return_value = (MagicMock(), [])
+    mock_sweep.return_value = [MagicMock(k=5, coherence=0.5, perplexity=-100)]
+    mock_train.return_value = MagicMock()
+    df_with_topic = df.copy()
+    df_with_topic["Dominant_Topic"] = [0]
+    df_with_topic["Perc_Contribution"] = [0.8]
+    mock_assign.return_value = df_with_topic
+    mock_filter.return_value = (df_with_topic, {"failed_topic_assignment": 0, "passed_probability": 1, "passed_citations": 1, "selected_strict": 1, "recovered": 0})
+
+    inputs = iter([""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    # Spy on clean_text calls
+    captured_kwargs = {}
+    original_clean = clean_text
+
+    def spy_clean(text, **kwargs):
+        captured_kwargs.update(kwargs)
+        return original_clean(text, **kwargs)
+
+    monkeypatch.setattr("pipeline.runner.clean_text", spy_clean)
+
+    run_pipeline(cfg)
+
+    assert "extra_stopwords" in captured_kwargs
+    assert "study" in captured_kwargs["extra_stopwords"]
+    assert "blockchain" in captured_kwargs["extra_stopwords"]
+    assert captured_kwargs["nouns_only"] is True

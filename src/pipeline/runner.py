@@ -76,7 +76,11 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Legacy likely used abstract only or both.
     # Let's combine for richer topic modeling.
     text_data = (df_raw["title"] + " " + df_raw["abstract"]).tolist()
-    tokens = [clean_text(doc) for doc in text_data]
+    extra_stopwords = set(config.academic_stopwords) | set(config.domain_stopwords)
+    tokens = [
+        clean_text(doc, extra_stopwords=extra_stopwords, nouns_only=config.nouns_only)
+        for doc in text_data
+    ]
 
     logger.info("Creating dictionary and corpus...")
     dictionary, corpus = create_corpus(tokens)
