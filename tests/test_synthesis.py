@@ -11,6 +11,7 @@ from pipeline.synthesis import (
     plot_topics,
     generate_report,
     export_report_tex,
+    export_report_json,
     _plot_horizontal_bar,
     plot_bibliometrics,
 )
@@ -209,3 +210,41 @@ class TestExportReportTexWithMetrics:
             assert "450" in content
             assert "Topics (K)" in content
             assert "8" in content
+
+
+# ── export_report_json ────────────────────────────────────────────
+
+
+class TestExportReportJson:
+    def test_exports_json_metadata(self):
+        """Verify export_report_json writes structured JSON."""
+        from pipeline.metrics import PipelineMetrics
+        import json
+
+        metrics = PipelineMetrics(
+            scopus_raw=100,
+            wos_raw=50,
+            duplicates_removed=10,
+            unique_papers=140,
+            selected_k=5,
+            coherence_score=0.5,
+            papers_per_topic={0: 20, 1: 30},
+            failed_topic_assignment=5,
+            passed_probability=100,
+            passed_citations=90,
+            papers_selected_strict=80,
+            papers_recovered=10,
+            papers_final=90,
+            year_min=2020,
+            year_max=2025,
+            total_citations=1000,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir) / "metadata.json"
+            export_report_json(metrics, out)
+            assert out.exists()
+            with open(out) as f:
+                data = json.load(f)
+            assert data["ingestion"]["scopus_raw"] == 100
+            assert data["topic_modeling"]["papers_per_topic"]["0"] == 20
+            assert data["filtering"]["papers_final"] == 90

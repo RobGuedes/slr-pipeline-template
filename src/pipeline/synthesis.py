@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import json
 import re
 
 import pandas as pd
@@ -183,6 +184,30 @@ Total Citations & {total_cites} \\
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(tex_content)
+
+
+def export_report_json(metrics: "PipelineMetrics", output_path: Path | str) -> None:
+    """Export PipelineMetrics as structured JSON metadata.
+
+    Parameters
+    ----------
+    metrics : PipelineMetrics
+        Complete pipeline statistics.
+    output_path : Path | str
+        Path to save the .json file.
+    """
+    data = metrics.to_dict()
+
+    # Convert dict keys to strings for JSON
+    if "papers_per_topic" in data.get("topic_modeling", {}):
+        topic_dict = data["topic_modeling"]["papers_per_topic"]
+        data["topic_modeling"]["papers_per_topic"] = {
+            str(k): v for k, v in topic_dict.items()
+        }
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 def plot_topics(
