@@ -14,27 +14,30 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import pandas as pd
+
 from pipeline.config import PipelineConfig
 from pipeline.ingest import ingest_all
+from pipeline.metrics import PipelineMetrics
 from pipeline.preprocess import setup_nltk, clean_text, create_corpus
 from pipeline.topic_model import (
     perform_lda_sweep,
     train_final_model,
     select_top_candidates,
 )
-from pipeline.topic_identify import get_all_topic_labels
+from pipeline.topic_identify import get_all_topic_labels, export_topic_terms
 from pipeline.topic_select import assign_dominant_topic, filter_documents
 from pipeline.quality_review import export_for_review
 from pipeline.synthesis import (
-    generate_report,
     export_report_tex,
+    export_report_json,
     plot_topics,
     plot_topic_audit,
     plot_bibliometrics,
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 # Configure basic logging
 logging.basicConfig(
@@ -61,7 +64,7 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
 
     # ── Step 1 & 2: Ingest ─────────────────────────────────────────────
     logger.info(f"Ingesting raw data from {config.raw_dir}")
-    df_raw = ingest_all(config.raw_dir, config)
+    df_raw, ingest_counts = ingest_all(config.raw_dir, config, return_counts=True)
     logger.info(f"Ingested {len(df_raw)} unique documents.")
 
     # ── Step 3: Preprocess ─────────────────────────────────────────────
@@ -73,7 +76,11 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Legacy likely used abstract only or both.
     # Let's combine for richer topic modeling.
     text_data = (df_raw["title"] + " " + df_raw["abstract"]).tolist()
-    tokens = [clean_text(doc) for doc in text_data]
+    extra_stopwords = set(config.academic_stopwords) | set(config.domain_stopwords)
+    tokens = [
+        clean_text(doc, extra_stopwords=extra_stopwords, nouns_only=config.nouns_only)
+        for doc in text_data
+    ]
 
     logger.info("Creating dictionary and corpus...")
     dictionary, corpus = create_corpus(tokens)
@@ -128,7 +135,7 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
                     f"  Invalid: K={chosen} not in sweep range. Valid: {sorted(valid_ks)}"
                 )
         except ValueError:
-            print(f"  Invalid input. Enter a number.")
+            print("  Invalid input. Enter a number.")
         attempts += 1
     else:
         logger.warning(f"Max attempts reached. Using best K={best_k}.")
@@ -153,6 +160,9 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     for tid, label in labels.items():
         logger.info(f"Topic {tid}: {label}")
 
+    logger.info("Exporting topic terms with weights...")
+    export_topic_terms(final_model, config.processed_dir)
+
     # ── Step 7: Selection ──────────────────────────────────────────────
     logger.info("Assigning dominant topics and filtering...")
     df_topics = assign_dominant_topic(df_raw, final_model, corpus)
@@ -160,7 +170,12 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Map topic IDs to labels for readability?
     # Usually we keep ID for processing, map for display.
 
-    df_selected = filter_documents(df_topics, config, full_df=df_topics)
+    # Count papers per topic (exclude failed assignments with Dominant_Topic == -1)
+    papers_per_topic = df_topics[df_topics["Dominant_Topic"] >= 0]["Dominant_Topic"].value_counts().to_dict()
+
+    df_selected, filter_stats = filter_documents(
+        df_topics, config, full_df=df_topics, return_stats=True
+    )
     logger.info(f"Selected {len(df_selected)} documents after filtering.")
 
     # ── Step 8: Quality Review Export ──────────────────────────────────
@@ -171,14 +186,34 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # ── Step 9: Synthesis ──────────────────────────────────────────────
     logger.info("Generating synthesis reports...")
 
-    # 1. Report stats
-    stats = generate_report(df_selected)
-    logger.info(f"Report Stats: {stats}")
+    # Build PipelineMetrics
+    metrics = PipelineMetrics(
+        scopus_raw=ingest_counts["scopus"],
+        wos_raw=ingest_counts["wos"],
+        duplicates_removed=ingest_counts["duplicates_removed"],
+        unique_papers=ingest_counts["unique"],
+        selected_k=optimal_k,
+        coherence_score=selected_coherence,
+        papers_per_topic=papers_per_topic,
+        failed_topic_assignment=filter_stats["failed_topic_assignment"],
+        passed_probability=filter_stats["passed_probability"],
+        passed_citations=filter_stats["passed_citations"],
+        papers_selected_strict=filter_stats["selected_strict"],
+        papers_recovered=filter_stats["recovered"],
+        papers_final=len(df_selected),
+        year_min=int(df_selected["year"].min()) if len(df_selected) > 0 and pd.notna(df_selected["year"].min()) else 0,
+        year_max=int(df_selected["year"].max()) if len(df_selected) > 0 and pd.notna(df_selected["year"].max()) else 0,
+        total_citations=int(df_selected["cited_by"].sum()) if len(df_selected) > 0 else 0,
+    )
 
-    # Export for LaTeX
+    # Export both synthesis reports
     tex_path = config.processed_dir / "synthesis_report.tex"
     logger.info(f"Exporting synthesis report to {tex_path}...")
-    export_report_tex(stats, tex_path)
+    export_report_tex(metrics, tex_path)
+
+    json_path = config.processed_dir / "synthesis_metadata.json"
+    logger.info(f"Exporting synthesis metadata to {json_path}...")
+    export_report_json(metrics, json_path)
 
     # 2. Bibliometric plots
     logger.info("Generating bibliometric plots...")

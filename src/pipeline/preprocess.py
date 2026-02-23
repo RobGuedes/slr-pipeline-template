@@ -55,21 +55,33 @@ def _get_wordnet_pos(tag: str) -> str:
         return wordnet.NOUN
 
 
-def clean_text(text: str) -> list[str]:
+def clean_text(
+    text: str,
+    extra_stopwords: set[str] | None = None,
+    nouns_only: bool = False,
+) -> list[str]:
     """Clean, tokenize, POS-lemmatize, and deduplicate a single document.
 
     Pipeline (matches legacy notebook methodology):
     1. Lowercase & unidecode (remove accents)
     2. Tokenize with RegexpTokenizer(r'\\w+')
-    3. Remove stopwords
-    4. POS-tag and lemmatize with correct part-of-speech
-    5. Remove duplicate tokens (preserve first-occurrence order)
-    6. Remove short tokens (len <= 2)
+    3. POS-tag all tokens (preserves context for accurate tagging)
+    4. Filter by POS if nouns_only is True
+    5. Remove English stopwords
+    6. Lemmatize with correct part-of-speech
+    7. Remove extra stopwords (after lemmatization)
+    8. Remove duplicate tokens (preserve first-occurrence order)
+    9. Remove short tokens (len <= 2)
 
     Parameters
     ----------
     text : str
         Raw text (e.g. abstract + title).
+    extra_stopwords : set[str] | None
+        Additional stopwords to remove (academic + domain-specific).
+        Matched against lemmatized tokens.
+    nouns_only : bool
+        If True, keep only tokens tagged as nouns (NN, NNS, NNP, NNPS).
 
     Returns
     -------
@@ -85,22 +97,32 @@ def clean_text(text: str) -> list[str]:
     # 2. Tokenize (keeps digits-in-words like lstm2, t5)
     tokens = _tokenizer.tokenize(text)
 
-    # 3. Stopwords
-    stops = set(stopwords.words("english"))
-    tokens = [t for t in tokens if t not in stops]
-
-    # 4. POS-aware lemmatization
-    lemmatizer = WordNetLemmatizer()
+    # 3. POS-tag all tokens (before removing stopwords for better context)
     pos_tags = nltk.pos_tag(tokens)
+
+    # 4. POS filter (if nouns_only, keep only noun tags)
+    if nouns_only:
+        pos_tags = [(token, tag) for token, tag in pos_tags if tag.startswith("N")]
+
+    # 5. Remove English stopwords
+    english_stops = set(stopwords.words("english"))
+    pos_tags = [(token, tag) for token, tag in pos_tags if token not in english_stops]
+
+    # 6. Lemmatize with POS-aware lemmatization
+    lemmatizer = WordNetLemmatizer()
     tokens = [
         lemmatizer.lemmatize(token, _get_wordnet_pos(tag))
         for token, tag in pos_tags
     ]
 
-    # 5. Deduplicate (preserve order)
+    # 7. Remove extra stopwords (after lemmatization so "methods" -> "method" matches)
+    if extra_stopwords:
+        tokens = [t for t in tokens if t not in extra_stopwords]
+
+    # 8. Deduplicate (preserve order)
     tokens = list(OrderedDict.fromkeys(tokens))
 
-    # 6. Length filter
+    # 9. Length filter
     tokens = [t for t in tokens if len(t) > 2]
 
     return tokens

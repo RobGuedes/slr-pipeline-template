@@ -2,9 +2,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 from pipeline.runner import run_pipeline
 from pipeline.config import PipelineConfig
+from pipeline.preprocess import clean_text
 
 
 @patch("pipeline.runner.ingest_all")
@@ -15,7 +15,6 @@ from pipeline.config import PipelineConfig
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
@@ -31,7 +30,6 @@ def test_end_to_end_flow(
     mock_plot_audit,
     mock_plot,
     mock_tex,
-    mock_report,
     mock_filter,
     mock_assign,
     mock_train,
@@ -44,8 +42,15 @@ def test_end_to_end_flow(
     """Verify the sequence of steps in the pipeline."""
 
     # Setup mocks
-    mock_ingest.return_value = pd.DataFrame(
-        {"title": ["Paper A"], "abstract": ["Abstract of paper A"]}
+    df = pd.DataFrame({
+        "title": ["Paper A"],
+        "abstract": ["Abstract of paper A"],
+        "year": [2020],
+        "cited_by": [10],
+    })
+    mock_ingest.return_value = (
+        df,
+        {"scopus": 1, "wos": 1, "duplicates_removed": 1, "unique": 1}
     )
     mock_corpus.return_value = (MagicMock(name="dictionary"), MagicMock(name="corpus"))
 
@@ -60,6 +65,22 @@ def test_end_to_end_flow(
     mock_top_candidates.return_value = [mock_sweep_result]
 
     mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign to return df with Dominant_Topic
+    df_topics = df.copy()
+    df_topics["Dominant_Topic"] = [0]
+    df_topics["Topic_Prob"] = [0.9]
+    mock_assign.return_value = df_topics
+
+    # Mock filter to return tuple
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 1,
+        "passed_citations": 1,
+        "selected_strict": 1,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_topics, filter_stats)
 
     # Run pipeline
     cfg = PipelineConfig(raw_dir=Path("/tmp/raw"), processed_dir=Path("/tmp/proc"))
@@ -77,7 +98,6 @@ def test_end_to_end_flow(
     mock_assign.assert_called_once()
     mock_filter.assert_called_once()
     mock_plot.assert_called_once()
-    mock_report.assert_called_once()
 
 
 @patch("pipeline.runner.ingest_all")
@@ -88,7 +108,6 @@ def test_end_to_end_flow(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
@@ -104,7 +123,6 @@ def test_interactive_k_selection(
     mock_plot_audit,
     mock_plot,
     mock_tex,
-    mock_report,
     mock_filter,
     mock_assign,
     mock_train,
@@ -117,8 +135,15 @@ def test_interactive_k_selection(
     """Pipeline prompts user and trains model with chosen K."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame(
-        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    df = pd.DataFrame({
+        "title": ["Paper A"],
+        "abstract": ["Abstract A"],
+        "year": [2020],
+        "cited_by": [10],
+    })
+    mock_ingest.return_value = (
+        df,
+        {"scopus": 1, "wos": 1, "duplicates_removed": 1, "unique": 1}
     )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
@@ -135,6 +160,21 @@ def test_interactive_k_selection(
     ]
 
     mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign and filter
+    df_topics = df.copy()
+    df_topics["Dominant_Topic"] = [0]
+    df_topics["Topic_Prob"] = [0.9]
+    mock_assign.return_value = df_topics
+
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 1,
+        "passed_citations": 1,
+        "selected_strict": 1,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_topics, filter_stats)
 
     cfg = PipelineConfig(raw_dir=Path("/tmp/raw"), processed_dir=Path("/tmp/proc"))
     run_pipeline(cfg)
@@ -155,7 +195,6 @@ def test_interactive_k_selection(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
@@ -171,7 +210,6 @@ def test_empty_input_uses_default_best_k(
     mock_plot_audit,
     mock_plot,
     mock_tex,
-    mock_report,
     mock_filter,
     mock_assign,
     mock_train,
@@ -184,8 +222,15 @@ def test_empty_input_uses_default_best_k(
     """Empty input (just Enter) should use the default best K."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame(
-        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    df = pd.DataFrame({
+        "title": ["Paper A"],
+        "abstract": ["Abstract A"],
+        "year": [2020],
+        "cited_by": [10],
+    })
+    mock_ingest.return_value = (
+        df,
+        {"scopus": 1, "wos": 1, "duplicates_removed": 1, "unique": 1}
     )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
@@ -199,6 +244,21 @@ def test_empty_input_uses_default_best_k(
     ]
 
     mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign and filter
+    df_topics = df.copy()
+    df_topics["Dominant_Topic"] = [0]
+    df_topics["Topic_Prob"] = [0.9]
+    mock_assign.return_value = df_topics
+
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 1,
+        "passed_citations": 1,
+        "selected_strict": 1,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_topics, filter_stats)
 
     cfg = PipelineConfig(raw_dir=Path("/tmp/raw"), processed_dir=Path("/tmp/proc"))
     run_pipeline(cfg)
@@ -216,7 +276,6 @@ def test_empty_input_uses_default_best_k(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
@@ -232,7 +291,6 @@ def test_invalid_then_valid_k_selection(
     mock_plot_audit,
     mock_plot,
     mock_tex,
-    mock_report,
     mock_filter,
     mock_assign,
     mock_train,
@@ -245,8 +303,15 @@ def test_invalid_then_valid_k_selection(
     """First attempt enters K not in sweep range; second attempt succeeds."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame(
-        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    df = pd.DataFrame({
+        "title": ["Paper A"],
+        "abstract": ["Abstract A"],
+        "year": [2020],
+        "cited_by": [10],
+    })
+    mock_ingest.return_value = (
+        df,
+        {"scopus": 1, "wos": 1, "duplicates_removed": 1, "unique": 1}
     )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
@@ -260,6 +325,21 @@ def test_invalid_then_valid_k_selection(
     ]
 
     mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign and filter
+    df_topics = df.copy()
+    df_topics["Dominant_Topic"] = [0]
+    df_topics["Topic_Prob"] = [0.9]
+    mock_assign.return_value = df_topics
+
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 1,
+        "passed_citations": 1,
+        "selected_strict": 1,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_topics, filter_stats)
 
     cfg = PipelineConfig(raw_dir=Path("/tmp/raw"), processed_dir=Path("/tmp/proc"))
     run_pipeline(cfg)
@@ -277,7 +357,6 @@ def test_invalid_then_valid_k_selection(
 @patch("pipeline.runner.train_final_model")
 @patch("pipeline.runner.assign_dominant_topic")
 @patch("pipeline.runner.filter_documents")
-@patch("pipeline.runner.generate_report")
 @patch("pipeline.runner.export_report_tex")
 @patch("pipeline.runner.plot_topics")
 @patch("pipeline.runner.plot_topic_audit")
@@ -293,7 +372,6 @@ def test_exhausted_attempts_fall_back_to_best_k(
     mock_plot_audit,
     mock_plot,
     mock_tex,
-    mock_report,
     mock_filter,
     mock_assign,
     mock_train,
@@ -306,8 +384,15 @@ def test_exhausted_attempts_fall_back_to_best_k(
     """Three invalid inputs exhaust the retry loop; default K is used."""
     from pipeline.topic_model import SweepResult
 
-    mock_ingest.return_value = pd.DataFrame(
-        {"title": ["Paper A"], "abstract": ["Abstract A"]}
+    df = pd.DataFrame({
+        "title": ["Paper A"],
+        "abstract": ["Abstract A"],
+        "year": [2020],
+        "cited_by": [10],
+    })
+    mock_ingest.return_value = (
+        df,
+        {"scopus": 1, "wos": 1, "duplicates_removed": 1, "unique": 1}
     )
     mock_corpus.return_value = (MagicMock(name="dict"), MagicMock(name="corpus"))
 
@@ -321,6 +406,21 @@ def test_exhausted_attempts_fall_back_to_best_k(
     ]
 
     mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign and filter
+    df_topics = df.copy()
+    df_topics["Dominant_Topic"] = [0]
+    df_topics["Topic_Prob"] = [0.9]
+    mock_assign.return_value = df_topics
+
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 1,
+        "passed_citations": 1,
+        "selected_strict": 1,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_topics, filter_stats)
 
     cfg = PipelineConfig(raw_dir=Path("/tmp/raw"), processed_dir=Path("/tmp/proc"))
     run_pipeline(cfg)
@@ -337,3 +437,168 @@ def test_uses_existing_model_if_provided():
     but runner should handle overrides. For now, we test vanilla flow.
     """
     pass
+
+
+@patch("pipeline.runner.ingest_all")
+@patch("pipeline.runner.clean_text")
+@patch("pipeline.runner.create_corpus")
+@patch("pipeline.runner.perform_lda_sweep")
+@patch("pipeline.runner.select_top_candidates")
+@patch("pipeline.runner.train_final_model")
+@patch("pipeline.runner.assign_dominant_topic")
+@patch("pipeline.runner.filter_documents")
+@patch("pipeline.runner.export_report_tex")
+@patch("pipeline.runner.plot_topics")
+@patch("pipeline.runner.plot_topic_audit")
+@patch("pipeline.runner.plot_bibliometrics")
+@patch("pipeline.runner.export_for_review")
+@patch("pipeline.runner.get_all_topic_labels")
+@patch("pipeline.runner.export_topic_terms")
+def test_exports_synthesis_metadata_json(
+    mock_topic_terms,
+    mock_labels,
+    mock_export_review,
+    mock_plot_biblio,
+    mock_plot_audit,
+    mock_plot,
+    mock_tex,
+    mock_filter,
+    mock_assign,
+    mock_train,
+    mock_top_candidates,
+    mock_sweep,
+    mock_corpus,
+    mock_clean,
+    mock_ingest,
+    tmp_path,
+    monkeypatch,
+):
+    """Verify runner exports synthesis_metadata.json."""
+    import json
+    from pipeline.topic_model import SweepResult
+
+    # Mock user input for K selection
+    inputs = iter([""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    # Setup mocks
+    mock_ingest.return_value = (
+        pd.DataFrame({
+            "title": ["Paper A", "Paper B"],
+            "abstract": ["Abstract A", "Abstract B"],
+            "year": [2020, 2021],
+            "cited_by": [10, 20],
+        }),
+        {"scopus": 3, "wos": 2, "duplicates_removed": 3, "unique": 2},
+    )
+    mock_corpus.return_value = (MagicMock(name="dictionary"), MagicMock(name="corpus"))
+
+    sweep_results = [SweepResult(k=5, coherence=0.5, perplexity=-6.0)]
+    mock_sweep.return_value = sweep_results
+    mock_top_candidates.return_value = sweep_results
+
+    mock_train.return_value = MagicMock(name="lda_model")
+
+    # Mock assign_dominant_topic to return a dataframe with topic assignments
+    df_topics = pd.DataFrame({
+        "title": ["Paper A", "Paper B"],
+        "abstract": ["Abstract A", "Abstract B"],
+        "year": [2020, 2021],
+        "cited_by": [10, 20],
+        "Dominant_Topic": [0, 1],
+        "Topic_Prob": [0.9, 0.8],
+    })
+    mock_assign.return_value = df_topics
+
+    # Mock filter_documents to return filtered df and stats
+    df_selected = df_topics.copy()
+    filter_stats = {
+        "failed_topic_assignment": 0,
+        "passed_probability": 2,
+        "passed_citations": 2,
+        "selected_strict": 2,
+        "recovered": 0,
+    }
+    mock_filter.return_value = (df_selected, filter_stats)
+
+    # Run pipeline
+    config = PipelineConfig(raw_dir=tmp_path / "raw", processed_dir=tmp_path / "proc")
+    config.processed_dir.mkdir(parents=True, exist_ok=True)
+    run_pipeline(config)
+
+    # Verify JSON file was created with correct structure
+    json_path = config.processed_dir / "synthesis_metadata.json"
+    assert json_path.exists()
+
+    with open(json_path) as f:
+        data = json.load(f)
+
+    assert "ingestion" in data
+    assert "topic_modeling" in data
+    assert "filtering" in data
+    assert "final_dataset" in data
+
+
+@patch("pipeline.runner.export_topic_terms")
+@patch("pipeline.runner.plot_bibliometrics")
+@patch("pipeline.runner.plot_topics")
+@patch("pipeline.runner.plot_topic_audit")
+@patch("pipeline.runner.export_for_review")
+@patch("pipeline.runner.assign_dominant_topic")
+@patch("pipeline.runner.train_final_model")
+@patch("pipeline.runner.perform_lda_sweep")
+@patch("pipeline.runner.create_corpus")
+@patch("pipeline.runner.filter_documents")
+@patch("pipeline.runner.ingest_all")
+def test_passes_stopwords_and_nouns_only_to_clean_text(
+    mock_ingest,
+    mock_filter,
+    mock_corpus,
+    mock_sweep,
+    mock_train,
+    mock_assign,
+    mock_review,
+    mock_audit,
+    mock_topics,
+    mock_biblio,
+    mock_topic_terms,
+    tmp_path,
+    monkeypatch,
+):
+    """Verify runner passes config stopwords and nouns_only to clean_text."""
+    cfg = PipelineConfig(raw_dir=tmp_path / "raw", processed_dir=tmp_path / "proc")
+    cfg.academic_stopwords = ("study",)
+    cfg.domain_stopwords = ("blockchain",)
+    cfg.nouns_only = True
+
+    # Setup mocks
+    df = pd.DataFrame({"title": ["test"], "abstract": ["test"], "year": [2020], "cited_by": [10]})
+    mock_ingest.return_value = (df, {"scopus": 1, "wos": 0, "unique": 1, "duplicates_removed": 0})
+    mock_corpus.return_value = (MagicMock(), [])
+    mock_sweep.return_value = [MagicMock(k=5, coherence=0.5, perplexity=-100)]
+    mock_train.return_value = MagicMock()
+    df_with_topic = df.copy()
+    df_with_topic["Dominant_Topic"] = [0]
+    df_with_topic["Perc_Contribution"] = [0.8]
+    mock_assign.return_value = df_with_topic
+    mock_filter.return_value = (df_with_topic, {"failed_topic_assignment": 0, "passed_probability": 1, "passed_citations": 1, "selected_strict": 1, "recovered": 0})
+
+    inputs = iter([""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    # Spy on clean_text calls
+    captured_kwargs = {}
+    original_clean = clean_text
+
+    def spy_clean(text, **kwargs):
+        captured_kwargs.update(kwargs)
+        return original_clean(text, **kwargs)
+
+    monkeypatch.setattr("pipeline.runner.clean_text", spy_clean)
+
+    run_pipeline(cfg)
+
+    assert "extra_stopwords" in captured_kwargs
+    assert "study" in captured_kwargs["extra_stopwords"]
+    assert "blockchain" in captured_kwargs["extra_stopwords"]
+    assert captured_kwargs["nouns_only"] is True

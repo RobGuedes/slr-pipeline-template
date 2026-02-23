@@ -118,3 +118,52 @@ class TestCreateCorpus:
         dictionary, _ = create_corpus(docs)
         # IDs should be contiguous 0..N
         assert sorted(dictionary.keys()) == list(range(len(dictionary)))
+
+
+# ── clean_text with extra_stopwords ────────────────────────────────────
+
+
+class TestCleanTextExtraStopwords:
+    @pytest.fixture(scope="class", autouse=True)
+    def setup_nltk_data(self):
+        """Ensure NLTK data is present for tests."""
+        setup_nltk()
+
+    def test_removes_extra_stopwords(self):
+        tokens = clean_text(
+            "this study investigates machine learning methods",
+            extra_stopwords={"study", "method"},
+        )
+        assert "study" not in tokens
+        assert "method" not in tokens
+        assert "machine" in tokens
+
+    def test_empty_extra_stopwords_changes_nothing(self):
+        tokens_default = clean_text("machine learning algorithms")
+        tokens_explicit = clean_text(
+            "machine learning algorithms", extra_stopwords=set()
+        )
+        assert tokens_default == tokens_explicit
+
+
+# ── clean_text with nouns_only ─────────────────────────────────────────
+
+
+class TestCleanTextNounsOnly:
+    @pytest.fixture(scope="class", autouse=True)
+    def setup_nltk_data(self):
+        """Ensure NLTK data is present for tests."""
+        setup_nltk()
+
+    def test_keeps_only_nouns(self):
+        # "running" is a verb, "algorithm" is a noun
+        tokens = clean_text("running the algorithm quickly", nouns_only=True)
+        assert "algorithm" in tokens
+        assert "running" not in tokens
+        assert "quickly" not in tokens
+
+    def test_nouns_only_false_keeps_all_pos(self):
+        tokens = clean_text("running the algorithm quickly", nouns_only=False)
+        # "run" (lemmatized verb) should be present when nouns_only=False
+        assert "algorithm" in tokens
+        assert "run" in tokens

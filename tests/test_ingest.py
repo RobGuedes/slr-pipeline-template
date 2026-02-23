@@ -144,3 +144,16 @@ class TestIngestAll:
         cfg = PipelineConfig(raw_dir=FIXTURES)
         df = ingest_all(cfg.raw_dir, cfg)
         assert len(df) > 0
+
+    def test_returns_source_counts_when_requested(self):
+        """Verify ingest_all can return per-source counts."""
+        config = PipelineConfig(
+            raw_dir=Path("tests/fixtures"),
+            included_doc_types=("Article",),
+        )
+        df, counts = ingest_all(config.raw_dir, config, return_counts=True)
+        assert "scopus" in counts
+        assert "wos" in counts
+        assert "unique" in counts
+        assert "duplicates_removed" in counts
+        assert isinstance(counts["scopus"], int)
