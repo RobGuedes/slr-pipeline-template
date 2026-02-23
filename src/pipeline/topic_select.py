@@ -205,7 +205,8 @@ def filter_documents(
     df: pd.DataFrame,
     config: "PipelineConfig",
     full_df: pd.DataFrame | None = None,
-) -> pd.DataFrame:
+    return_stats: bool = False,
+) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, int]]:
     """Filter documents based on probability and citation count.
 
     Rules:
@@ -224,11 +225,21 @@ def filter_documents(
     full_df : pd.DataFrame | None
         Full dataset (before any filtering) used to compute top-15 authors
         and sources for recency recovery. If None, recovery is skipped.
+    return_stats : bool
+        If True, returns a tuple of (DataFrame, stats_dict) where stats_dict
+        contains filter stage counts.
 
     Returns
     -------
-    pd.DataFrame
-        Filtered DataFrame.
+    pd.DataFrame | tuple[pd.DataFrame, dict[str, int]]
+        Filtered DataFrame, or (DataFrame, stats) if return_stats=True.
+
+        The stats dictionary contains:
+        - failed_topic_assignment: Count of documents with Dominant_Topic == -1
+        - passed_probability: Count meeting min_topic_prob threshold
+        - passed_citations: Count meeting min_citations threshold
+        - selected_strict: Count passing all strict filters
+        - recovered: Count recovered by recency filter (0 if disabled)
     """
     if "Dominant_Topic" not in df.columns or "Perc_Contribution" not in df.columns:
         raise ValueError("DataFrame must have assigned dominant topics.")
@@ -246,12 +257,29 @@ def filter_documents(
     # Combine masks
     final_mask = prob_mask & valid_topic_mask & citation_mask
 
+    # Collect stats if requested
+    if return_stats:
+        stats = {
+            "failed_topic_assignment": int((df["Dominant_Topic"] == -1).sum()),
+            "passed_probability": int(prob_mask.sum()),
+            "passed_citations": int(citation_mask.sum()),
+            "selected_strict": int(final_mask.sum()),
+            "recovered": 0,
+        }
+
     # 4. Optional second-pass recency recovery
+    recovered_df = None
     if config.recency_filter_enabled and full_df is not None:
         top_authors = compute_top_authors(full_df, config.top_n_authors)
         top_sources = compute_top_sources(full_df, config.top_n_sources)
         df_rejected = df[~final_mask]
-        recovered = recover_recent_papers(df_rejected, config, top_authors, top_sources)
-        return pd.concat([df[final_mask], recovered]).copy()
+        recovered_df = recover_recent_papers(df_rejected, config, top_authors, top_sources)
+        if return_stats:
+            stats["recovered"] = len(recovered_df)
+        result = pd.concat([df[final_mask], recovered_df]).copy()
+    else:
+        result = df[final_mask].copy()
 
-    return df[final_mask].copy()
+    if return_stats:
+        return result, stats
+    return result

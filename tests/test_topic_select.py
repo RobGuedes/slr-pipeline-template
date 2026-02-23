@@ -409,3 +409,27 @@ class TestFilterDocumentsWithRecovery:
         cfg = PipelineConfig(min_topic_prob=0.0, min_citations=10)
         result = filter_documents(df, cfg)
         assert len(result) == 0  # strict filter rejects, no recovery without full_df
+
+
+# ── filter_documents with stats ───────────────────────────────────────
+
+
+class TestFilterDocumentsWithStats:
+    def test_returns_filter_stage_counts(self):
+        """Verify filter_documents can return intermediate filter counts."""
+        config = PipelineConfig(min_topic_prob=0.7, min_citations=5)
+        df = pd.DataFrame({
+            "Dominant_Topic": [0, 1, 2, -1, 0],
+            "Perc_Contribution": [0.8, 0.6, 0.9, 0.0, 0.75],
+            "cited_by": [10, 3, 8, 0, 12],
+        })
+        result, stats = filter_documents(df, config, return_stats=True)
+        assert "failed_topic_assignment" in stats
+        assert "passed_probability" in stats
+        assert "passed_citations" in stats
+        assert "selected_strict" in stats
+        assert stats["failed_topic_assignment"] == 1  # Dominant_Topic == -1
+        # Rows 0,2,4 pass: prob>=0.7, citations>=5, valid topic
+        assert stats["selected_strict"] == 3
+        assert stats["passed_probability"] == 3  # Rows 0,2,4
+        assert stats["passed_citations"] == 3  # Rows 0,2,4
