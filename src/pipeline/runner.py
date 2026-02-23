@@ -170,13 +170,13 @@ def run_pipeline(config: PipelineConfig | None = None) -> None:
     # Map topic IDs to labels for readability?
     # Usually we keep ID for processing, map for display.
 
-    # Count papers per topic (exclude failed assignments with Dominant_Topic == -1)
-    papers_per_topic = df_topics[df_topics["Dominant_Topic"] >= 0]["Dominant_Topic"].value_counts().to_dict()
-
     df_selected, filter_stats = filter_documents(
         df_topics, config, full_df=df_topics, return_stats=True
     )
     logger.info(f"Selected {len(df_selected)} documents after filtering.")
+
+    # Count papers per topic from final selected papers (after all filtering)
+    papers_per_topic = df_selected["Dominant_Topic"].value_counts().to_dict()
 
     # ── Step 8: Quality Review Export ──────────────────────────────────
     review_path = config.processed_dir / "to_review.csv"
