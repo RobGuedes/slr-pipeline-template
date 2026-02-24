@@ -172,6 +172,9 @@ class PipelineConfig:
         "component",
         "effect",
         "year",
+        "john",
+        "wiley",
+        "son",
     )
     domain_stopwords: tuple[str, ...] = (
         "market", 
